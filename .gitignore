@@ -1,0 +1,13 @@
+*.pyc
+*/_pycache_
+*.pkl
+*.tar
+*.pth
+*.onnx
+*.mat
+*.log
+*.swp
+pretrained/
+deploy/
+log/
+

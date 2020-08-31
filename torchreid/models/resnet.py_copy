@@ -1,0 +1,504 @@
+from __future__ import absolute_import
+from __future__ import division
+
+import torch
+from torch import nn
+from torch.nn import functional as F
+import torchvision
+from .marginal_linear import *
+from .circle_layer import Circle
+
+__all__ = ['ResNet50', 'ResNet101', 'ResNet50M', 'ResNet50V2', 'ResNet50V3', 'ResNet50V3MS', 'ResNet50V3a', 'ResNet50V3aLg', 'ResNet101V3a']
+
+
+def weights_init_kaiming(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.kaiming_normal_(m.weight, a=0, mode='fan_out')
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
+    elif classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
+    elif classname.find('BatchNorm') != -1:
+        if m.affine:
+            nn.init.normal_(m.weight, 1.0, 0.02)
+            nn.init.constant_(m.bias, 0.0)
+
+
+def weights_init_classifier(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.normal_(m.weight, std=0.001)
+    #    nn.init.constant_(m.bias, 0.0)
+
+
+class ResNet50(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+       # self.avgpool = nn.AvgPool2d(7, stride=1) #TRY
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.classifier = nn.Linear(2048, num_classes)
+        self.feat_dim = 2048
+
+    def forward(self, x):
+        x = self.base(x)
+        #x = F.avg_pool2d(x, x.size()[2:])
+        x = self.avgpool(x)  #TRY
+        f = x.view(x.size(0), -1)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+#class ResNet50V2(nn.Module):
+#    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+#        super(ResNet50V2, self).__init__()
+#        self.loss = loss
+#        resnet50 = torchvision.models.resnet50(pretrained=True)
+#        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+#        self.base[-1][0].conv2.stride = (1,1)
+#        self.base[-1][0].downsample[0].stride = (1,1)
+#        self.avgpool = nn.AdaptiveAvgPool2d(1)
+#        self.classifier = nn.Linear(2048, num_classes)
+#        self.classifier.apply(weights_init_classifier)
+#
+#    def forward(self, x):
+#        x = self.base(x)
+#        x = self.avgpool(x)
+#        f = x.view(x.size(0), -1)
+#        if not self.training:
+#            return f
+#        y = self.classifier(f)
+#
+#        if self.loss == {'xent'}:
+#            return y
+#        elif self.loss == {'xent', 'htri'}:
+#            return y, f
+#        else:
+#            raise KeyError("Unsupported loss: {}".format(self.loss))
+#
+#class ResNet50V2(nn.Module):
+#    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+#        super(ResNet50V2, self).__init__()
+#        self.loss = loss
+#        resnet50 = torchvision.models.resnet50(pretrained=True)
+#        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+#
+#        self.bottleneck = nn.Sequential(
+#            nn.Linear(2048, 512),
+#            nn.BatchNorm1d(512),
+#            nn.LeakyReLU(0.1),
+#            nn.Dropout(p=0.5)
+#        )
+#        self.bottleneck.apply(weights_init_kaiming)
+#        self.classifier = nn.Linear(512, num_classes)
+#        self.classifier.apply(weights_init_classifier)
+#
+#    def forward(self, x):
+#        x = self.base(x)
+#        x = F.avg_pool2d(x, x.size()[2:])
+#        f = x.view(x.size(0), -1)
+#        if not self.training:
+#            return f
+#        y = self.bottleneck(f)
+#        y = self.classifier(y)
+#
+#        if self.loss == {'xent'}:
+#            return y
+#        elif self.loss == {'xent', 'htri'}:
+#            return y, f
+#        else:
+#            raise KeyError("Unsupported loss: {}".format(self.loss))
+#
+
+class ResNet50V3(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V3, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+        self.base[-1][0].conv2.stride = (1, 1)
+        self.base[-1][0].downsample[0].stride = (1, 1)
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.bottleneck = nn.Sequential(
+            nn.BatchNorm1d(2048),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = nn.Linear(2048, num_classes, bias = False)
+        self.classifier.apply(weights_init_classifier)
+#        self.classifier = Circle(2048, num_classes)
+#        self.classifier.apply(weights_init_classifier)
+    def forward(self, x, targets =None):
+        x = self.base(x)
+        x = self.avgpool(x)
+        f = x.view(x.size(0), -1)
+        f_after = self.bottleneck(f)
+        if not self.training:
+            return f_after
+        y = self.classifier(f_after)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+class ResNet50V2(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V2, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.base[-1][0].conv2.stride = (1, 1)
+        self.base[-1][0].downsample[0].stride = (1, 1)
+        self.bottleneck = nn.Sequential(
+            nn.BatchNorm1d(2048),
+        )
+        self.bottleneck[0].bias.requires_grad_(False)
+        self.bottleneck.apply(weights_init_kaiming)
+#        self.classifier = nn.Linear(2048, num_classes, bias = False)
+#        self.classifier.apply(weights_init_classifier)
+        self.classifier = Circle(in_feat = 2048, num_classes = num_classes)
+        self.classifier.apply(weights_init_kaiming)
+    def forward(self, x, targets =None):
+        x = self.base(x)
+        x = self.avgpool(x)
+        f = x.view(x.size(0), -1)
+        f_after = self.bottleneck(f)
+        if not self.training:
+            return f_after
+        y = self.classifier(f_after, targets)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f_after
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+#class ResNet50V3(nn.Module):
+#    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+#        super(ResNet50V3, self).__init__()
+#        self.loss = loss
+#        resnet50 = torchvision.models.resnet50(pretrained=True)
+#        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+#
+#        self.bottleneck = nn.Sequential(
+#            nn.Linear(2048, 512),
+#            nn.BatchNorm1d(512),
+#        )
+#        self.bottleneck.apply(weights_init_kaiming)
+#        self.classifier = nn.Linear(512, num_classes)
+#        self.classifier.apply(weights_init_classifier)
+#
+#    def forward(self, x):
+#        x = self.base(x)
+#        x = F.avg_pool2d(x, x.size()[2:])
+#        f = x.view(x.size(0), -1)
+#        f = self.bottleneck(f)
+#        if not self.training:
+#            return f
+#        y = self.classifier(f)
+#
+#        if self.loss == {'xent'}:
+#            return y
+#        elif self.loss == {'xent', 'htri'}:
+#            return y, f
+#        else:
+#            raise KeyError("Unsupported loss: {}".format(self.loss))
+#
+'''
+class ResNet50V3MS(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V3MS, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+
+        self.bottleneck = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.BatchNorm1d(512),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = nn.Linear(512, num_classes)
+        self.classifier.apply(weights_init_classifier)
+
+        self.pix_classifier = nn.Conv2d(2048, num_classes, kernel_size=1, stride=1, padding=0)
+        self.pix_classifier.apply(weights_init_kaiming)
+
+    def forward(self, x):
+        x = self.base(x)
+        x1 = F.avg_pool2d(x, x.size()[2:])
+        f = x1.view(x1.size(0), -1)
+        f = self.bottleneck(f)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+        py = self.pix_classifier(x)
+
+        if self.loss == {'xent'}:
+            return y, py
+        elif self.loss == {'xent', 'htri'}:
+            return y, py, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+'''
+
+
+class ResNet50V3MS(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V3MS, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+
+        self.bottleneck = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.BatchNorm1d(512),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = nn.Linear(512, num_classes)
+        self.classifier.apply(weights_init_classifier)
+
+        self.pix_classifier = nn.Conv2d(2048, num_classes, kernel_size=1, stride=1, padding=0)
+        self.pix_classifier.apply(weights_init_kaiming)
+
+    def forward(self, x):
+        x = self.base(x)
+        x1 = F.avg_pool2d(x, x.size()[2:])
+        f = x1.view(x1.size(0), -1)
+        f = self.bottleneck(f)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+
+        x2 = F.adaptive_max_pool2d(x, (2,1))
+        py = self.pix_classifier(x2)
+
+        if self.loss == {'xent'}:
+            #return y, py
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, py, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+class ResNet50V3a(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V3a, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+        self.base[-1][0].conv2.stride = (1, 1)
+        self.base[-1][0].downsample[0].stride = (1, 1)
+        self.avgpool = nn.AvgPool2d((16,8), stride=(16,8)) #TRY
+
+        self.bottleneck = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.BatchNorm1d(512),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = nn.Linear(512, num_classes)
+        self.classifier.apply(weights_init_classifier)
+
+    def forward(self, x):
+        x = self.base(x)
+        x = self.avgpool(x)  #TRY
+        #x = F.avg_pool2d(x, x.size()[2:])
+        f = x.view(x.size(0), -1)
+        f = self.bottleneck(f)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+class ResNet50V3aLg(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet50V3aLg, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.base = nn.Sequential(*list(resnet50.children())[:-2])
+        self.base[-1][0].conv2.stride = (1, 1)
+        self.base[-1][0].downsample[0].stride = (1, 1)
+
+        self.bottleneck = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.BatchNorm1d(512),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = AddMarginProduct(512, num_classes, s=1, m=0)
+
+    def forward(self, x, label):
+        x = self.base(x)
+        x = F.avg_pool2d(x, x.size()[2:])
+        f = x.view(x.size(0), -1)
+        f = self.bottleneck(f)
+        #f = F.normalize(f) #TRY
+        if not self.training:
+            return f
+        y = self.classifier(f, label)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+class ResNet101(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet101, self).__init__()
+        self.loss = loss
+        resnet101 = torchvision.models.resnet101(pretrained=True)
+        self.base = nn.Sequential(*list(resnet101.children())[:-2])
+        self.classifier = nn.Linear(2048, num_classes)
+        self.feat_dim = 2048 # feature dimension
+
+    def forward(self, x):
+        x = self.base(x)
+        x = F.avg_pool2d(x, x.size()[2:])
+        f = x.view(x.size(0), -1)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+class ResNet101V3a(nn.Module):
+    def __init__(self, num_classes, loss={'xent'}, **kwargs):
+        super(ResNet101V3a, self).__init__()
+        self.loss = loss
+        resnet101 = torchvision.models.resnet101(pretrained=True)
+        self.base = nn.Sequential(*list(resnet101.children())[:-2])
+        self.base[-1][0].conv2.stride = (1, 1)
+        self.base[-1][0].downsample[0].stride = (1, 1)
+
+        self.bottleneck = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.BatchNorm1d(512),
+        )
+        self.bottleneck.apply(weights_init_kaiming)
+        self.classifier = nn.Linear(512, num_classes)
+        self.classifier.apply(weights_init_classifier)
+
+    def forward(self, x):
+        x = self.base(x)
+        x = F.avg_pool2d(x, x.size()[2:])
+        f = x.view(x.size(0), -1)
+        f = self.bottleneck(f)
+        if not self.training:
+            return f
+        y = self.classifier(f)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+class ResNet50M(nn.Module):
+    """ResNet50 + mid-level features.
+
+    Reference:
+    Yu et al. The Devil is in the Middle: Exploiting Mid-level Representations for
+    Cross-Domain Instance Matching. arXiv:1711.08106.
+    """
+    def __init__(self, num_classes=0, loss={'xent'}, **kwargs):
+        super(ResNet50M, self).__init__()
+        self.loss = loss
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        base = nn.Sequential(*list(resnet50.children())[:-2])
+        self.layers1 = nn.Sequential(base[0], base[1], base[2])
+        self.layers2 = nn.Sequential(base[3], base[4])
+        self.layers3 = base[5]
+        self.layers4 = base[6]
+        self.layers5a = base[7][0]
+        self.layers5b = base[7][1]
+        self.layers5c = base[7][2]
+        self.fc_fuse = nn.Sequential(nn.Linear(4096, 1024), nn.BatchNorm1d(1024), nn.ReLU())
+        self.classifier = nn.Linear(3072, num_classes)
+        self.feat_dim = 3072 # feature dimension
+
+    def forward(self, x):
+        x1 = self.layers1(x)
+        x2 = self.layers2(x1)
+        x3 = self.layers3(x2)
+        x4 = self.layers4(x3)
+        x5a = self.layers5a(x4)
+        x5b = self.layers5b(x5a)
+        x5c = self.layers5c(x5b)
+
+        x5a_feat = F.avg_pool2d(x5a, x5a.size()[2:]).view(x5a.size(0), x5a.size(1))
+        x5b_feat = F.avg_pool2d(x5b, x5b.size()[2:]).view(x5b.size(0), x5b.size(1))
+        x5c_feat = F.avg_pool2d(x5c, x5c.size()[2:]).view(x5c.size(0), x5c.size(1))
+
+        midfeat = torch.cat((x5a_feat, x5b_feat), dim=1)
+        midfeat = self.fc_fuse(midfeat)
+
+        combofeat = torch.cat((x5c_feat, midfeat), dim=1)
+        
+        if not self.training:
+            return combofeat
+        
+        prelogits = self.classifier(combofeat)
+        
+        if self.loss == {'xent'}:
+            return prelogits
+        elif self.loss == {'xent', 'htri'}:
+            return prelogits, combofeat
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
+
+
+
+if __name__=='__main__':
+    def count_num_param(model):
+        num_param = sum(p.numel() for p in model.parameters()) / 1e+06
+        #if hasattr(model, 'classifier') and isinstance(model.classifier, nn.Module):
+            # we ignore the classifier because it is unused at test time
+            #num_param -= sum(p.numel() for p in model.classifier.parameters()) / 1e+06
+        return num_param
+
+    resnet = torchvision.models.resnet50(pretrained=True)
+    base = nn.Sequential(*list(resnet.children())[:-2])
+    print(count_num_param(resnet), count_num_param(base))
+
+    net = ResNet50(1000, loss={'xent','htri'})
+    print(count_num_param(net), count_num_param(net.base))
+    net.train(True)
+    x = torch.Tensor(2,3,384,128)
+    y = net(x)
+    from IPython import embed
+    embed()
+    #pdb.set_trace()
