@@ -42,7 +42,7 @@ config.resume = ''
 config.onnx_export= ''
 config.load_weights = ''
 config.evaluate = False
-config.eval_step = 20
+config.eval_step = 10
 config.start_eval = 0
 config.save_dir = 'log'
 config.vis_ranked_res = False
@@ -53,6 +53,10 @@ config.use_kpts = False
 config.mask_num = 0
 
 config.warmup = 1
+config.num_instance = 4
 
+config.apex = 1
 
+# postprocess
 config.rerank = 1
+

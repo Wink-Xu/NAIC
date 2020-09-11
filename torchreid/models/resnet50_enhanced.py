@@ -7,6 +7,9 @@ from torch.nn import functional as F
 import torchvision
 from .marginal_linear import *
 from .circle_layer import Circle
+from torchreid.losses.face_loss import Arcface
+from .resnet_ibn_a import resnet101_ibn_a
+from .resnet_ibn_b import resnet101_ibn_b
 import math
 __all__ = ['ResNet50_bot', 'ResNet50_bot_circle', 'ResNet101_bot']
 
@@ -378,48 +381,7 @@ class ResNet_more(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 				
-		
-				
-def ResNet50_more(pretrained=True, **kwargs):
-    """Constructs a ResNet-50 model.
 
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    ibn =1
-    if ibn:
-        pretrain_path = './pretrained/r50_ibn_a.pth'
-    else:
-        pretrain_path = './pretrained/resnet50-19c8e357.pth'
-    model = ResNet_more(last_stride = 1, bn_norm="BN", num_splits = 1, with_ibn = ibn , with_se=0, with_nl=1, block= Bottleneck, layers = [3, 4, 6, 3], non_layers = [0, 2, 3, 0])	
-    if pretrained:
-        if not ibn:            
-            state_dict = torch.load(pretrain_path)
-	# Remove module.encoder in name
-            new_state_dict = {}
-            for k in state_dict:
-                new_k = k
-                if new_k in model.state_dict() and (model.state_dict()[new_k].shape == state_dict[k].shape):
-                    new_state_dict[new_k] = state_dict[k]
-            state_dict = new_state_dict
-            print(f"Loading pretrained model from {pretrain_path}")
-        else:
-            state_dict = torch.load(pretrain_path)  # ibn-net
-            # Remove module in name
-            new_state_dict = {}
-            for k in state_dict:
-                new_k = k
-                if new_k in model.state_dict() and (model.state_dict()[new_k].shape == state_dict[k].shape):
-                    new_state_dict[new_k] = state_dict[k]
-            state_dict = new_state_dict
-            print(f"Loading pretrained model from {pretrain_path}")
-        model.load_state_dict(state_dict, strict= False)
-    return model				
-
-
-
-
-	
 class ResNet50_bot_circle(nn.Module):
     def __init__(self, num_classes, loss={'xent'}, **kwargs):
         super(ResNet50_bot_circle, self).__init__()
@@ -450,39 +412,44 @@ class ResNet50_bot_circle(nn.Module):
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
+				
+def ResNet50_more(config, pretrained=True,  **kwargs):
+    """Constructs a ResNet-50 model.
 
-	
-class ResNet50_bot(nn.Module):
-    def __init__(self, num_classes, loss={'xent'}, **kwargs):
-        super(ResNet50_bot, self).__init__()
-        self.loss = loss
-        self.base = ResNet50_more(pretrained=True)
-        self.avgpool = GeneralizedMeanPoolingP()
-        self.bottleneck = nn.Sequential(
-            nn.BatchNorm1d(2048),
-        )
-        self.bottleneck.apply(weights_init_kaiming)
-        self.classifier = nn.Linear(2048, num_classes, bias = False)
-        self.classifier.apply(weights_init_classifier)
-    def forward(self, x, targets =None):
-        x = self.base(x)
-        x = self.avgpool(x)
-        f = x.view(x.size(0), -1)
-        f_after = self.bottleneck(f)
-        if not self.training:
-            return f_after
-        y = self.classifier(f_after)
-
-        if self.loss == {'xent'}:
-            return y
-        elif self.loss == {'xent', 'htri'}:
-            return y, f
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    ibn = config.ibn
+    if ibn:
+        pretrain_path = './pretrained/r50_ibn_a.pth'
+    else:
+        pretrain_path = './pretrained/resnet50-19c8e357.pth'
+    model = ResNet_more(last_stride = 1, bn_norm="BN", num_splits = 1, with_ibn = ibn , with_se=0, with_nl=config.nl, block= Bottleneck, layers = [3, 4, 6, 3], non_layers = [0, 2, 3, 0])	
+    if pretrained:
+        if not ibn:            
+            state_dict = torch.load(pretrain_path)
+	# Remove module.encoder in name
+            new_state_dict = {}
+            for k in state_dict:
+                new_k = k
+                if new_k in model.state_dict() and (model.state_dict()[new_k].shape == state_dict[k].shape):
+                    new_state_dict[new_k] = state_dict[k]
+            state_dict = new_state_dict
+            print(f"Loading pretrained model from {pretrain_path}")
         else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+            state_dict = torch.load(pretrain_path)  # ibn-net
+            # Remove module in name
+            new_state_dict = {}
+            for k in state_dict:
+                new_k = k
+                if new_k in model.state_dict() and (model.state_dict()[new_k].shape == state_dict[k].shape):
+                    new_state_dict[new_k] = state_dict[k]
+            state_dict = new_state_dict
+            print(f"Loading pretrained model from {pretrain_path}")
+        model.load_state_dict(state_dict, strict= False)
+    return model				
 
-
-
-def ResNet101_more(pretrained=True, **kwargs):
+def ResNet101_ibn_a(config, pretrained=True, **kwargs):
     """Constructs a ResNet-101 model.
 
     Args:
@@ -491,7 +458,42 @@ def ResNet101_more(pretrained=True, **kwargs):
 
     pretrain_path = './pretrained/resnet101_ibn_a.pth.tar'
    
-    model = ResNet_more(last_stride = 1, bn_norm="BN", num_splits = 1, with_ibn = 1 , with_se=0, with_nl=1, block= Bottleneck, layers = [3, 4, 23, 3], non_layers = [0, 2, 9, 0])	
+    model = resnet101_ibn_a(last_stride = 1)
+    if pretrained:
+        model.load_param(pretrain_path)
+        print('Loading pretrained ImageNet model......from {}'.format(pretrain_path))
+    return model	
+
+def ResNet101_ibn_b(config, pretrained=True, **kwargs):
+    """Constructs a ResNet-101 model.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+
+    pretrain_path = './pretrained/resnet101_ibn_b.pth'
+   
+    model = resnet101_ibn_b(last_stride = 1)
+    if pretrained:
+        model.load_param(pretrain_path)
+        print('Loading pretrained ImageNet model......from {}'.format(pretrain_path))
+    return model	
+
+
+def ResNet101_more(config, pretrained=True, **kwargs):
+    """Constructs a ResNet-101 model.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    ibn = config.ibn
+    if ibn:
+        pretrain_path = './pretrained/resnet101_ibn_a.pth.tar'
+    else:
+        pretrain_path = './pretrained/resnet50-19c8e357.pth'
+    
+   
+    model = ResNet_more(last_stride = 1, bn_norm="BN", num_splits = 1, with_ibn = config.ibn , with_se=0, with_nl=0, block= Bottleneck, layers = [3, 4, 23, 3], non_layers = [0, 2, 9, 0])	
     if pretrained:
         state_dict = torch.load(pretrain_path)  # ibn-net
         # Remove module in name
@@ -504,6 +506,53 @@ def ResNet101_more(pretrained=True, **kwargs):
         print(f"Loading pretrained model from {pretrain_path}")
     model.load_state_dict(state_dict, strict= False)
     return model				
+
+
+class ResNet50_bot(nn.Module):
+    def __init__(self, num_classes, config, loss={'xent'},  **kwargs):
+        super(ResNet50_bot, self).__init__()
+        self.loss_type = config.loss_type
+        self.loss = loss
+        if config.resnet101_a:
+            self.base = ResNet101_ibn_a(config, pretrained=True)
+        elif config.resnet101_b:
+            self.base = ResNet101_ibn_b(config, pretrained=True)
+        else:
+            self.base = ResNet50_more(config, pretrained=True)
+        if config.gem:
+            self.gap = GeneralizedMeanPoolingP()
+        else:
+            self.gap = nn.AdaptiveAvgPool2d(1)
+        #
+        self.bottleneck =  nn.BatchNorm1d(2048)
+        self.bottleneck.bias.requires_grad_(False)
+        self.bottleneck.apply(weights_init_kaiming)
+        if config.loss_type == 'arcface':
+            print('using {} with s:{}, m: {}'.format(config.loss_type, config.COSINE_SCALE, config.COSINE_MARGIN))
+            self.classifier = Arcface(2048, num_classes,
+                                        s=config.COSINE_SCALE, m=config.COSINE_MARGIN)
+        else:
+            self.classifier = nn.Linear(2048, num_classes, bias = False)
+            self.classifier.apply(weights_init_classifier)
+    def forward(self, x, targets =None):
+        x = self.base(x)
+        x = self.gap(x)
+        f = x.view(x.size(0), -1)
+        f_after = self.bottleneck(f)
+        if not self.training:
+            return f_after
+        if self.loss_type == 'arcface':
+            y = self.classifier(f_after, targets)
+        else:
+            y = self.classifier(f_after)
+
+        if self.loss == {'xent'}:
+            return y
+        elif self.loss == {'xent', 'htri'}:
+            return y, f
+        else:
+            raise KeyError("Unsupported loss: {}".format(self.loss))
+
 
 class ResNet101_bot(nn.Module):
     def __init__(self, num_classes, loss={'xent'}, **kwargs):

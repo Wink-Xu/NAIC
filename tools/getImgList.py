@@ -16,26 +16,40 @@ with open(datapath, 'r') as fr:
     for each in lines:
         picNum[each.split(':')[-1].strip()] += 1
 
-for i in picNum.keys():
-    if picNum[i] >= 3 and picNum[i] <= 100:
-        mask_dict.append(i)
-mask_dict = mask_dict[:5000]
+valData_query_ids = []
+valData_gallery_ids = []
+query_ids = 0
+gallery_nums = 0
+for i, num in picNum.items():
+    if picNum[i] == 1:
+        valData_gallery_ids.append(i)
+        gallery_nums += 1
+    elif picNum[i] >= 3 and query_ids <= 1500:
+        valData_query_ids.append(i)
+        query_ids += 1
+        gallery_nums += num - 1
+    elif gallery_nums <= 21000 and num > 20:
+        valData_gallery_ids.append(i)
+        gallery_nums += num
+
 
 main_dir = '../../data/NAIC_2020/train'
-with open(os.path.join(main_dir, 'list_train_img_all_no123_5000.txt'), 'w') as ft, open(os.path.join(main_dir, 'list_query_img.txt'), 'w') as fq, \
-                                                                  open(os.path.join(main_dir, 'list_gallery_img.txt'), 'w') as fg:
+with open(os.path.join(main_dir, 'list_train_img_all_ratio.txt'), 'w') as ft, open(os.path.join(main_dir, 'list_query_img_ratio.txt'), 'w') as fq, \
+                                                                  open(os.path.join(main_dir, 'list_gallery_img_ratio.txt'), 'w') as fg:
     query_dir = main_dir
     with open(os.path.join(query_dir, 'label.txt'), 'r') as fr:
         lines = fr.readlines()
         dict_eval = defaultdict(list)
         for index, i in enumerate(lines):
-            imgpath = os.path.join('images', i.split(':')[0])
             imgid = i.split(':')[1]
-            if imgid.strip() in mask_dict:
+            if imgid.strip() in valData_query_ids:     
+                dict_eval[imgid].append( os.path.join('../data/NAIC_2020/train/images', i.split(':')[0]) )
+            elif imgid.strip() in valData_gallery_ids:   
+                imgpath = os.path.join('../data/NAIC_2020/train/images', i.split(':')[0])
+                fg.write(imgpath + ' ' + imgid)
+            else:
+                imgpath = os.path.join('../data/NAIC_2020/train/images', i.split(':')[0])
                 ft.write(imgpath + ' ' + imgid)
-            if index > 67240:
-                imgid = i.split(':')[1]
-                dict_eval[imgid].append( os.path.join('images', i.split(':')[0]) )
         for each in dict_eval.keys():
             if len(dict_eval[each]) > 2:
                 fq.write(dict_eval[each][0] + ' ' + each)
@@ -44,6 +58,45 @@ with open(os.path.join(main_dir, 'list_train_img_all_no123_5000.txt'), 'w') as f
             else:
                 for j in range(len(dict_eval[each])):
                     fg.write(dict_eval[each][j] + ' ' + each)
+
+
+# # #### Get extra train img list
+# chuSaipath = '/data/xuzihao/NAIC/ReID/data/NAIC_2020/extraTrain/REID2019_chusai/train_list.txt'
+
+# picNum = defaultdict(int)
+# with open(chuSaipath, 'r') as fr:
+#     lines = fr.readlines()
+#     for each in lines:
+#         picNum[each.split(' ')[-1].strip()] += 1
+
+# main_dir = '/data/xuzihao/NAIC/ReID/data/NAIC_2020/extraTrain/REID2019_chusai/chusai_2019'
+# with open(os.path.join('../../data/NAIC_2020/train', 'list_train_img_all_ratio.txt'), 'a') as ft:
+#     query_dir = main_dir
+#     with open(os.path.join(chuSaipath), 'r') as fr:
+#         lines = fr.readlines()
+#         for index, i in enumerate(lines):
+#             imgid = i.split(' ')[-1]
+#             if picNum[imgid.strip()] >= 2:     
+#                 imgpath = os.path.join('../data/NAIC_2020/extraTrain/REID2019_chusai/chusai_2019', i.split(' ')[0][6:])
+#                 ft.write(imgpath + ' ' + imgid.strip() + '_cs')
+#                 ft.write('\n')
+
+picNum = defaultdict(int)
+fuSaipath = '/data/xuzihao/NAIC/ReID/data/NAIC_2020/extraTrain/REID2019_fusai/train_list.txt'
+with open(fuSaipath, 'r') as fr:
+    lines = fr.readlines()
+    for each in lines:
+        picNum[each.split(' ')[-1].strip()] += 1
+
+with open(os.path.join('../../data/NAIC_2020/train', 'list_train_img_all_ratio.txt'), 'a') as ft:
+    with open(os.path.join(fuSaipath), 'r') as fr:
+        lines = fr.readlines()
+        for index, i in enumerate(lines):
+            imgid = i.split(' ')[-1]
+            if picNum[imgid.strip()] >= 2:     
+                imgpath = os.path.join('../data/NAIC_2020/extraTrain/REID2019_fusai/fusai_2019_1', i.split(' ')[0][6:])
+                ft.write(imgpath + ' ' + imgid.strip() + '_fs')
+                ft.write('\n')
 
 #### Get test img list
 

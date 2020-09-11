@@ -3,7 +3,6 @@ import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 
-
 __all__ = ['ResNet', 'resnet50_ibn_b', 'resnet101_ibn_b',
            'resnet152_ibn_b']
 
@@ -21,11 +20,11 @@ def conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
-class BasicBlock_IBN_b(nn.Module):
+class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(BasicBlock_IBN_b, self).__init__()
+        super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
@@ -53,11 +52,11 @@ class BasicBlock_IBN_b(nn.Module):
         return out
 
 
-class Bottleneck_IBN_b(nn.Module):
+class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, IN=False):
-        super(Bottleneck_IBN_b, self).__init__()
+        super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
@@ -97,12 +96,12 @@ class Bottleneck_IBN_b(nn.Module):
         return out
 
 
-class ResNet_IBN_b(nn.Module):
+class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000):
+    def __init__(self,last_stride, block, layers, num_classes=1000):
         scale = 64
         self.inplanes = scale
-        super(ResNet_IBN_b, self).__init__()
+        super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, scale, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.InstanceNorm2d(scale, affine=True)
@@ -110,10 +109,10 @@ class ResNet_IBN_b(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, scale, layers[0], stride=1, IN=True)
         self.layer2 = self._make_layer(block, scale*2, layers[1], stride=2, IN=True)
-        self.layer3 = self._make_layer(block, scale*4, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, scale*8, layers[3], stride=2)
-        self.avgpool = nn.AvgPool2d(7)
-        self.fc = nn.Linear(scale * 8 * block.expansion, num_classes)
+        self.layer3 = self._make_layer(block, scale*4, layers[2], stride=2, IN=True)
+        self.layer4 = self._make_layer(block, scale*8, layers[3], stride=last_stride)
+        # self.avgpool = nn.AvgPool2d(7)
+        # self.fc = nn.Linear(scale * 8 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -155,40 +154,39 @@ class ResNet_IBN_b(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        #x = self.avgpool(x)
+        #x = x.view(x.size(0), -1)
+        #x = self.fc(x)
 
         return x
-		
+
     def load_param(self, model_path):
         param_dict = torch.load(model_path)
+        if 'state_dict' in param_dict:
+            param_dict = param_dict['state_dict']
         for i in param_dict:
             if 'fc' in i:
                 continue
-            self.state_dict()[i].copy_(param_dict[i])
+            self.state_dict()[i.replace('module.','')].copy_(param_dict[i])
 
 
-
-def resnet50_ibn_b(pretrained=False, **kwargs):
+def resnet50_ibn_b(last_stride,pretrained=False, **kwargs):
     """Constructs a ResNet-50 model.
-
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet_IBN_b(Bottleneck_IBN_b, [3, 4, 6, 3], **kwargs)
+    model = ResNet(last_stride,Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:
-        model.load_param(model_zoo.load_url(model_urls['resnet50']))
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
     return model
 
 
-def resnet101_ibn_b(pretrained=False, **kwargs):
+def resnet101_ibn_b(last_stride,pretrained=False, **kwargs):
     """Constructs a ResNet-101 model.
-
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck_IBN_b, [3, 4, 23, 3], **kwargs)
+    model = ResNet(last_stride,Bottleneck, [3, 4, 23, 3], **kwargs)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
     return model
@@ -196,11 +194,10 @@ def resnet101_ibn_b(pretrained=False, **kwargs):
 
 def resnet152_ibn_b(pretrained=False, **kwargs):
     """Constructs a ResNet-152 model.
-
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck_IBN_b, [3, 8, 36, 3], **kwargs)
+    model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
     return model

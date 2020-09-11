@@ -13,8 +13,6 @@ import os.path as osp
 from scipy.io import loadmat
 import numpy as np
 import h5py
-from scipy.misc import imsave
-
 
 class NAIC_2020(object):
     """
@@ -28,9 +26,9 @@ class NAIC_2020(object):
         self.train_dir = osp.join(self.dataset_dir, 'train')
         self.gallery_dir = osp.join(self.dataset_dir, 'train')
         self.query_dir = osp.join(self.dataset_dir, 'train')
-        self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img_all_no12.txt')
-        self.list_query_path = osp.join(self.dataset_dir, 'train', 'list_query_img.txt')
-        self.list_gallery_path = osp.join(self.dataset_dir, 'train', 'list_gallery_img.txt')
+        self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img_all_ratio.txt')
+        self.list_query_path = osp.join(self.dataset_dir, 'train', 'list_query_img_ratio.txt')
+        self.list_gallery_path = osp.join(self.dataset_dir, 'train', 'list_gallery_img_ratio.txt')
 
         self._check_before_run()
         train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path, relabel = 1)
@@ -83,10 +81,12 @@ class NAIC_2020(object):
         pid2label = {pid:label for label, pid in enumerate(temp)}
         for img_idx, img_info in enumerate(lines):
             img_path, pid = img_info.split(' ')
-            if relabel: pid = pid2label[pid]
+            if relabel: 
+                pid = pid2label[pid]
+            
+            #img_path = osp.join(dir_path, img_path)
 
             camid = 1 #int(img_path.split('_')[2])
-            img_path = osp.join(dir_path, img_path)
             dataset.append((img_path, pid, camid))
             pid_container.add(pid)
         num_imgs = len(dataset)

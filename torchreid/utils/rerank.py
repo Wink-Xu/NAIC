@@ -27,6 +27,7 @@ __all__ = ['re_ranking']
 
 def re_ranking(q_g_dist, q_q_dist, g_g_dist, k1=20, k2=6, lambda_value=0.3):
 
+
     original_dist = np.concatenate(
         [
             np.concatenate([q_q_dist, q_g_dist], axis=1),

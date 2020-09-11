@@ -122,7 +122,7 @@ def main():
     )
 
     print("Initializing model: {}".format(config.arch))
-    model = models.init_model(name=config.arch, num_classes=dataset.num_train_pids, loss={'xent'}, use_gpu=use_gpu)
+    model = models.init_model(name=config.arch, num_classes=dataset.num_train_pids, loss={'xent'}, use_gpu=use_gpu, config = config)
     print("Model size: {:.3f} M".format(count_num_param(model)))
     print(model)
 
@@ -219,7 +219,7 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
 
             end = time.time()
 
-            features = model(imgs)
+            features = model(imgs, pids)
 
             if flip:
                 if isinstance(imgs, tuple):
@@ -229,7 +229,7 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
                 else:
                     imgs = fliplr(imgs, use_gpu)
                 
-                features += model(imgs)
+                features += model(imgs, pids)
 
             batch_time.update(time.time() - end)
 

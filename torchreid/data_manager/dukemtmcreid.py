@@ -13,7 +13,6 @@ import os.path as osp
 from scipy.io import loadmat
 import numpy as np
 import h5py
-from scipy.misc import imsave
 
 from torchreid.utils.iotools import mkdir_if_missing
 

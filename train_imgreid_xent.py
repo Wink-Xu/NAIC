@@ -25,21 +25,27 @@ from torchreid.dataset_loader import ImageDataset
 from torchreid import transforms as T
 import torchvision.transforms as TT
 from torchreid import models
-from torchreid.losses import CrossEntropyLabelSmooth, DeepSupervision, MGSupervision, TripletLoss
+from torchreid.losses import CrossEntropyLabelSmooth, DeepSupervision, MGSupervision, TripletLoss, WeightedTripletLoss
 from torchreid.utils.iotools import save_checkpoint, check_isfile
 from torchreid.utils.avgmeter import AverageMeter
 from torchreid.utils.logger import Logger
 from torchreid.utils.torchtools import set_bn_to_eval, count_num_param
 from torchreid.utils.reidtools import visualize_ranked_results
 from torchreid.eval_metrics import evaluate
-from torchreid.samplers import RandomIdentitySampler3
-from torchreid.optimizers import init_optim
+from torchreid.samplers import RandomIdentitySampler
+from torchreid.optimizers import init_optim, make_optimizer
 from torchreid.lr_scheduler import WarmupMultiStepLR
 import torchvision
 from IPython import embed
 import ipdb as pdb
 from configs.merge_config import merge_config
 import importlib
+
+
+from apex import amp
+import apex
+
+
 
 parser = argparse.ArgumentParser(description='Train image model')
 
@@ -101,26 +107,26 @@ def main():
     norm_mean = [0.485, 0.456, 0.406] + [0.0]*config.mask_num
     norm_std = [0.229, 0.224, 0.225] + [1.0]*config.mask_num
 
-    # transform_train = T.Compose([
-    #     T.Random2DTranslation(config.height, config.width, p=0.0),
-    #     T.RandomHorizontalFlip(),
-    #     TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
-    #     T.ToTensor(),
-    #     T.Normalize(mean=norm_mean, std=norm_std),
-    #     T.RandomErasing(),
-    # ])
-
     transform_train = T.Compose([
-        TT.Resize([config.height, config.width]),
-        TT.RandomHorizontalFlip(p=0.5),
-        TT.Pad(10),
-        TT.RandomCrop([config.height, config.width]),
-        TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
-        TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
-        TT.ToTensor(),
-        TT.Normalize(mean=norm_mean, std=norm_std),
-        T.RandomErasing()
+        T.Random2DTranslation(config.height, config.width, p=0.0),
+        T.RandomHorizontalFlip(),
+    ##    TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+        T.ToTensor(),
+        T.Normalize(mean=norm_mean, std=norm_std),
+        T.RandomErasing(),
     ])
+
+    # transform_train = T.Compose([
+    #     TT.Resize([config.height, config.width]),
+    #     TT.RandomHorizontalFlip(p=0.5),
+    #     TT.Pad(10),
+    #     TT.RandomCrop([config.height, config.width]),
+    #     TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+    #     TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
+    #     TT.ToTensor(),
+    #     TT.Normalize(mean=norm_mean, std=norm_std),
+    #     T.RandomErasing()
+    # ])
 
 
 
@@ -136,7 +142,7 @@ def main():
     if config.class_balance: 
         trainloader = DataLoader(
             ImageDataset(dataset.train, transform=transform_train),
-            sampler=RandomIdentitySampler3(dataset.train, config.train_batch, 4),
+            sampler=RandomIdentitySampler(dataset.train, config.train_batch, config.num_instance),
             batch_size=config.train_batch, num_workers=config.workers,
             pin_memory=pin_memory, drop_last=True,
         )
@@ -161,7 +167,10 @@ def main():
     )
 
     print("Initializing model: {}".format(config.arch))
-    model = models.init_model(name=config.arch, num_classes=dataset.num_train_pids, loss={'xent'}, use_gpu=use_gpu)
+    if config.triplet:
+        model = models.init_model(name=config.arch, num_classes=dataset.num_train_pids, loss={'xent', 'htri'}, use_gpu=use_gpu, config = config)
+    else:
+        model = models.init_model(name=config.arch, num_classes=dataset.num_train_pids, loss={'xent'}, use_gpu=use_gpu, config = config)
     print("Model size: {:.3f} M".format(count_num_param(model)))
     print(model)
 
@@ -169,10 +178,16 @@ def main():
         criterion = CrossEntropyLabelSmooth(num_classes=dataset.num_train_pids, use_gpu=use_gpu)
     else:
         criterion = nn.CrossEntropyLoss()
+    if config.triplet:
+        if config.weight_triplet:
+            criterion_htri = WeightedTripletLoss()
+        else:
+            criterion_htri = TripletLoss(config.TRI_MARGIN)
 
 
     if not config.debug:
-        optimizer = init_optim(config.optim, model.parameters(), config.lr, config.weight_decay)
+        optimizer = make_optimizer(config, model)
+        #optimizer = init_optim(config.optim, model.parameters(), config.lr, config.weight_decay)
         if config.warmup:
             print("---------- using Warmup method -----------")
             scheduler = WarmupMultiStepLR(optimizer, milestones = config.stepsize, gamma=config.gamma, warmup_factor = 0.01,                                                        warmup_iters = 10, warmup_method='linear')
@@ -189,6 +204,13 @@ def main():
         else:
             scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=config.stepsize, gamma=config.gamma)
         config.eval_step = 0
+
+### mix_precision
+    if config.apex:
+        model.to("cuda")
+        model, optimizer = amp.initialize(model, optimizer, opt_level="O1")             
+        print('Using apex for mix_precision with opt_level O1')
+
 
     if config.fixbase_epoch > 0:
         if hasattr(model, 'classifier') and isinstance(model.classifier, nn.Module):
@@ -272,7 +294,10 @@ def main():
 
     for epoch in range(config.start_epoch, config.max_epoch):
         start_train_time = time.time()
-        train(epoch, model, criterion, optimizer, trainloader, use_gpu, summary_writer, config)
+        if config.triplet:
+            train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_gpu, summary_writer, config)
+        else:
+            train(epoch, model, criterion, None, optimizer, trainloader, use_gpu, summary_writer, config)
         train_time += round(time.time() - start_train_time)
         
         scheduler.step()
@@ -316,7 +341,7 @@ def class_preds(outputs):
     _, preds = torch.max(score.data, 1)
     return preds
 
-def train(epoch, model, criterion, optimizer, trainloader, use_gpu, summary_writer, config, freeze_bn=False):
+def train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_gpu, summary_writer, config, freeze_bn=False):
     losses = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -336,32 +361,37 @@ def train(epoch, model, criterion, optimizer, trainloader, use_gpu, summary_writ
                 imgs = (imgs[0].cuda(), imgs[1].cuda())
             else:
                 imgs = imgs.cuda()
-        
-        if 'lg' in config.arch:
+
+        if config.triplet:
+            outputs, features = model(imgs, pids)
+        else:
             outputs = model(imgs, pids)
-        elif 'pg'==config.arch[:2] and config.mask_num > 0:
-            outputs = model(imgs[0], imgs[1])
-        else:
-            outputs= model(imgs)
-    #    import IPython
-    #    IPython.embed()
+
         if isinstance(outputs, tuple):
-            if config.arch=='resnet50v3ms':
-                loss = MGSupervision(criterion, outputs, pids)
+            ce_loss = DeepSupervision(criterion, outputs, pids)
+        else:
+            ce_loss = criterion(outputs, pids)
+        
+        if config.triplet:
+            if isinstance(features, tuple):
+                htri_loss = DeepSupervision(criterion_htri, features, pids)
             else:
-                loss = DeepSupervision(criterion, outputs, pids)
+                htri_loss = criterion_htri(features, pids)
+            
+            loss = config.CE_LOSS_WEIGHT * ce_loss + config.TRI_LOSS_WEIGHT * htri_loss
         else:
-            loss = criterion(outputs, pids)
-       
-        if config.arch=='resnet50v3ms' and isinstance(outputs, tuple):
-            preds = class_preds(outputs[0])
-        else:
-            preds = class_preds(outputs)
+            loss = ce_loss    
+        
+        preds = class_preds(outputs)
         corrects = float(torch.sum(preds == pids.data))
         acc = corrects / pids.size(0)
 
         optimizer.zero_grad()
-        loss.backward()
+        if config.apex:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
         optimizer.step()
 
         batch_time.update(time.time() - end)
@@ -373,15 +403,26 @@ def train(epoch, model, criterion, optimizer, trainloader, use_gpu, summary_writ
         summary_writer.add_scalar('loss', loss.item(), global_step)
         summary_writer.add_scalar('accuracy', acc, global_step)
         summary_writer.add_scalar('lr', optimizer.param_groups[0]['lr'], global_step)
-
-        if (batch_idx + 1) % config.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.4f} ({data_time.avg:.4f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Acc {acc.val:.4f} ({acc.avg:.4f})\t'.format(
-                   epoch + 1, batch_idx + 1, len(trainloader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, acc=accuracy))
+        if config.triplet:
+            if (batch_idx + 1) % config.print_freq == 0:
+                print('Epoch: [{0}][{1}/{2}]\t'
+                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Data {data_time.val:.4f} ({data_time.avg:.4f})\t'
+                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'Acc {acc.val:.4f} ({acc.avg:.4f})\t'.format(
+                    epoch + 1, batch_idx + 1, len(trainloader), batch_time=batch_time,
+                    data_time=data_time, loss=losses, acc=accuracy))
+                print('ce_loss:{:.4f}, htri_loss:{:.4f}\t'.format(ce_loss, htri_loss))
+        else:
+            if (batch_idx + 1) % config.print_freq == 0:
+                print('Epoch: [{0}][{1}/{2}]\t'
+                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Data {data_time.val:.4f} ({data_time.avg:.4f})\t'
+                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'Acc {acc.val:.4f} ({acc.avg:.4f})\t'.format(
+                    epoch + 1, batch_idx + 1, len(trainloader), batch_time=batch_time,
+                    data_time=data_time, loss=losses, acc=accuracy))
+           
         
         end = time.time()
 

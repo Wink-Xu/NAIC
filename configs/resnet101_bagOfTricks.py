@@ -28,3 +28,6 @@ config.save_dir = 'log'
 config.arch = 'resnet101_bot'
 config.label_smooth = True
 config.class_balance = True
+
+
+config.triplet = 1

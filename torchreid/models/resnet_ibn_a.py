@@ -3,7 +3,6 @@ import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 
-
 __all__ = ['ResNet_IBN', 'resnet50_ibn_a', 'resnet101_ibn_a',
            'resnet152_ibn_a']
 
@@ -76,7 +75,7 @@ class Bottleneck_IBN(nn.Module):
 
 class ResNet_IBN(nn.Module):
 
-    def __init__(self, last_stride, block, layers, num_classes=1000):
+    def __init__(self, last_stride, block, layers, frozen_stages=-1,num_classes=1000):
         scale = 64
         self.inplanes = scale
         super(ResNet_IBN, self).__init__()
@@ -85,6 +84,7 @@ class ResNet_IBN(nn.Module):
         self.bn1 = nn.BatchNorm2d(scale)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.frozen_stages = frozen_stages
         self.layer1 = self._make_layer(block, scale, layers[0])
         self.layer2 = self._make_layer(block, scale*2, layers[1], stride=2)
         self.layer3 = self._make_layer(block, scale*4, layers[2], stride=2)
@@ -123,6 +123,19 @@ class ResNet_IBN(nn.Module):
 
         return nn.Sequential(*layers)
 
+    def _freeze_stages(self):
+        if self.frozen_stages >= 0:
+            self.bn1.eval()
+            for m in [self.conv1, self.bn1]:
+                for param in m.parameters():
+                    param.requires_grad = False
+
+        for i in range(1, self.frozen_stages + 1):
+            m = getattr(self, 'layer{}'.format(i))
+            print('layer{}'.format(i))
+            m.eval()
+            for param in m.parameters():
+                param.requires_grad = False
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -142,10 +155,13 @@ class ResNet_IBN(nn.Module):
 
     def load_param(self, model_path):
         param_dict = torch.load(model_path)
+        if 'state_dict' in param_dict:
+            param_dict = param_dict['state_dict']
         for i in param_dict:
             if 'fc' in i:
                 continue
-            self.state_dict()[i].copy_(param_dict[i])
+            self.state_dict()[i.replace('module.','')].copy_(param_dict[i])
+
 
 
 def resnet50_ibn_a(last_stride, pretrained=False, **kwargs):

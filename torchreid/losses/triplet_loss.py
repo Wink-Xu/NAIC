@@ -180,103 +180,51 @@ class TripletLoss(object):
         return loss
 
 
+class WeightedTripletLoss(object):
+    """Related Weighted Triplet Loss theory can be found in paper
+    'Attention Network Robustification for Person ReID'."""
 
-'''
+    def __init__(self, margin=None):
+        self.margin = margin
 
-def reciprocal_neighbors_mining(dist_mat, labels, return_inds=False):
+        if margin is not None:
+            self.ranking_loss = nn.MarginRankingLoss(margin=margin)
+        else:
+            self.ranking_loss = nn.SoftMarginLoss()
+
+    def __call__(self, global_feat, labels, normalize_feature=False):
+        if normalize_feature:
+            global_feat = normalize(global_feat, axis=-1)
+
+        dist_mat = euclidean_dist(global_feat, global_feat)
+        dist_ap, dist_an, final_wp, final_wn = soft_example_mining(dist_mat, labels)
+        y = final_wn.new().resize_as_(final_wn).fill_(1)
+        if self.margin is not None:
+            loss = self.ranking_loss(dist_an, dist_ap, y)
+        else:
+            loss = self.ranking_loss(final_wn - final_wp, y)
+        return loss
+
+def soft_example_mining(dist_mat, labels):
+    eps = 1e-12
     assert len(dist_mat.size()) == 2
     assert dist_mat.size(0) == dist_mat.size(1)
     N = dist_mat.size(0)
-
     # shape [N, N]
     is_pos = labels.expand(N, N).eq(labels.expand(N, N).t())
     is_neg = labels.expand(N, N).ne(labels.expand(N, N).t())
 
-    # sort, ascend
-    sorted_dist, sorted_ind = dist_mat.sort(dim=1) 
-    nd_mat = dist_mat.data.cpu().numpy()
-    r_neigh = re_ranking(nd_mat)
-    r_neigh = sorted_ind.new(r_neigh)
-    
-    # choose medium hard pairs
-    a_ind_lst = []
-    p_ind_lst = []
-    n_ind_lst = []
-    ap_lst = []
-    an_lst = []
-    for i in range(sorted_ind.size(0)):
-        p_ind, n_ind = find_reciprocal_hard(r_neigh[i], is_pos[i], sorted_ind[i]) 
-        p_ind_lst.append(p_ind)
-        n_ind_lst.append(n_ind)
-        a_ind_lst.append(p_ind.new([i]*p_ind.size(0)))
-        ap_lst.append(dist_mat[i][p_ind])
-        an_lst.append(dist_mat[i][n_ind])
-    dist_ap = torch.cat(ap_lst, 0)
-    dist_an = torch.cat(an_lst, 0)
+    # shape [N]
+    dist_ap = dist_mat[is_pos].contiguous().view(N, -1)
+    dist_an = dist_mat[is_neg].contiguous().view(N, -1)
 
-    return dist_ap, dist_an
+    exp_dist_ap = torch.exp(dist_ap)
+    exp_dist_an = torch.exp(-dist_an)
 
+    wp = exp_dist_ap / (exp_dist_ap.sum(1, keepdim=True) + eps)
+    wn = exp_dist_an / (exp_dist_an.sum(1, keepdim=True) + eps)
 
-def find_reciprocal_hard(d_neigh, d_pos, d_sorted_ind):
-    sorted_pos = d_pos[d_sorted_ind]
-    pp = []
-    pn = []
-    pos = []
-    neg = []
-    for i in range(d_pos.size(0)):
-        if d_pos[i]==1 and d_neigh[i]==0:
-            pos.append(i)
-        if d_pos[i]==0 and d_neigh[i]==1:
-            neg.append(i)
+    final_wp = (wp*dist_ap).sum(1)
+    final_wn = (wn*dist_an) .sum(1)
 
-    for i in range(sorted_pos.size(0)):
-        if sorted_pos[i] > 0:
-            pp.append(i)
-        else:
-            pn.append(i)
-
-    if len(pos) > 0 and len(neg) > 0:
-        p_ind = []
-        n_ind = []
-        for i in pos:
-            p_ind.extend([i]*len(neg))
-            n_ind.extend(neg)
-        p_ind = d_sorted_ind.new(p_ind)
-        n_ind = d_sorted_ind.new(n_ind)
-    else:
-        p_ind = d_sorted_ind[[pp[-1]]]
-        n_ind = d_sorted_ind[[pn[0]]]
-    return p_ind, n_ind
-    
-
-import numpy as np
-def k_reciprocal_neigh(initial_rank, i, k1):
-    forward_k_neigh_index = initial_rank[i,:k1+1]
-    backward_k_neigh_index = initial_rank[forward_k_neigh_index,:k1+1]
-    fi = np.where(backward_k_neigh_index==i)[0]
-    return forward_k_neigh_index[fi]
-
-
-def re_ranking(dist_mat, k1=6):
-    dist_mat = np.transpose(dist_mat / np.max(dist_mat, axis=0))
-    # top K1+1
-    initial_rank = np.argpartition(dist_mat, range(1, k1+1))
-    r_neigh_index = np.zeros_like(initial_rank)
-
-    all_num = dist_mat.shape[0]
-    for i in range(all_num):
-        # k-reciprocal neighbors
-        k_reciprocal_index = k_reciprocal_neigh(initial_rank, i, k1)
-        k_reciprocal_expansion_index = k_reciprocal_index
-        for j in range(len(k_reciprocal_index)):
-            candidate = k_reciprocal_index[j]
-            candidate_k_reciprocal_index = k_reciprocal_neigh(initial_rank, candidate, int(np.around(k1/2)))
-            if len(np.intersect1d(candidate_k_reciprocal_index,k_reciprocal_index))> 2./3*len(candidate_k_reciprocal_index):
-                k_reciprocal_expansion_index = np.append(k_reciprocal_expansion_index,candidate_k_reciprocal_index)
-
-        k_reciprocal_expansion_index = np.unique(k_reciprocal_expansion_index)
-        r_neigh_index[i, k_reciprocal_expansion_index] = 1
-
-    return r_neigh_index
-
-'''
+    return dist_ap, dist_an, final_wp, final_wn

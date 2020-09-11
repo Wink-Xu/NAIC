@@ -5,10 +5,12 @@ from __future__ import print_function
 from .cross_entropy_loss import CrossEntropyLabelSmooth, CrossEntropyWithMaxEntropy
 #from .hard_mine_triplet_loss import TripletLoss
 from .triplet_loss import TripletLoss
+from .triplet_loss import WeightedTripletLoss
 from .center_loss import CenterLoss
 from .ring_loss import RingLoss
 from .circle_loss import LabelCircleLoss
 from .CrossEntropyFastReID import CrossEntropyLossFastReID 
+
 import pdb
 import torch
 

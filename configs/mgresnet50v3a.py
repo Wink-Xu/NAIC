@@ -13,8 +13,8 @@ config.width = 128
 
 # Optimization options
 
-config.optim = 'sgd'
-config.lr = 0.1
+config.optim = 'adam'
+config.lr = 0.00035
 
 # 
 config.max_epoch = 120
@@ -27,7 +27,8 @@ config.save_dir = 'log'
 
 config.arch = 'mgresnet50v3a'
 config.label_smooth = True
-config.class_balance = False
+config.class_balance = True
 
 config.warmup = 0
 
+config.triplet = 0

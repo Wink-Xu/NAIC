@@ -13,7 +13,7 @@ import os.path as osp
 from scipy.io import loadmat
 import numpy as np
 import h5py
-from scipy.misc import imsave
+
 
 
 class MSMT17(object):
