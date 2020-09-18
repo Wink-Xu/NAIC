@@ -10,6 +10,7 @@ from .circle_layer import Circle
 from torchreid.losses.face_loss import Arcface
 from .resnet_ibn_a import resnet101_ibn_a
 from .resnet_ibn_b import resnet101_ibn_b
+from .efficientnet import EfficientNet
 import math
 __all__ = ['ResNet50_bot', 'ResNet50_bot_circle', 'ResNet101_bot']
 
@@ -517,22 +518,27 @@ class ResNet50_bot(nn.Module):
             self.base = ResNet101_ibn_a(config, pretrained=True)
         elif config.resnet101_b:
             self.base = ResNet101_ibn_b(config, pretrained=True)
+        elif config.efficientnet:
+            self.base = EfficientNet.from_pretrained('efficientnet-b0', './pretrained/efficientnet-b0-355c32eb.pth')
         else:
             self.base = ResNet50_more(config, pretrained=True)
         if config.gem:
             self.gap = GeneralizedMeanPoolingP()
         else:
             self.gap = nn.AdaptiveAvgPool2d(1)
-        #
-        self.bottleneck =  nn.BatchNorm1d(2048)
+        if config.efficientnet:
+            feat_dims = self.base._fc.in_features
+        else:
+            feat_dims = 2048
+        self.bottleneck =  nn.BatchNorm1d(feat_dims)
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
         if config.loss_type == 'arcface':
             print('using {} with s:{}, m: {}'.format(config.loss_type, config.COSINE_SCALE, config.COSINE_MARGIN))
-            self.classifier = Arcface(2048, num_classes,
+            self.classifier = Arcface(feat_dims, num_classes,
                                         s=config.COSINE_SCALE, m=config.COSINE_MARGIN)
         else:
-            self.classifier = nn.Linear(2048, num_classes, bias = False)
+            self.classifier = nn.Linear(feat_dims, num_classes, bias = False)
             self.classifier.apply(weights_init_classifier)
     def forward(self, x, targets =None):
         x = self.base(x)

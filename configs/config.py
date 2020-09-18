@@ -56,7 +56,9 @@ config.warmup = 1
 config.num_instance = 4
 
 config.apex = 1
+config.syncBN = 1
 
 # postprocess
 config.rerank = 1
+config.aqe = 1
 

@@ -32,8 +32,9 @@ config.save_dir = 'log'
 config.arch = 'resnet50_bot'
 config.resnet101_a = 0
 config.resnet101_b = 1
+config.efficientnet = 0
 
-config.label_smooth = True
+config.label_smooth = False
 config.class_balance = True
 
 config.num_instance = 8
@@ -50,3 +51,5 @@ config.gem = 1
 config.loss_type = 'arcface'
 config.COSINE_SCALE = 30.0
 config.COSINE_MARGIN = 0.3
+
+config.load_weights = ''

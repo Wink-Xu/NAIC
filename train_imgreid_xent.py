@@ -106,27 +106,29 @@ def main():
 
     norm_mean = [0.485, 0.456, 0.406] + [0.0]*config.mask_num
     norm_std = [0.229, 0.224, 0.225] + [1.0]*config.mask_num
-
-    transform_train = T.Compose([
-        T.Random2DTranslation(config.height, config.width, p=0.0),
-        T.RandomHorizontalFlip(),
-    ##    TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
-        T.ToTensor(),
-        T.Normalize(mean=norm_mean, std=norm_std),
-        T.RandomErasing(),
-    ])
+    
 
     # transform_train = T.Compose([
-    #     TT.Resize([config.height, config.width]),
-    #     TT.RandomHorizontalFlip(p=0.5),
-    #     TT.Pad(10),
-    #     TT.RandomCrop([config.height, config.width]),
-    #     TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
-    #     TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
-    #     TT.ToTensor(),
-    #     TT.Normalize(mean=norm_mean, std=norm_std),
-    #     T.RandomErasing()
+    #     T.Random2DTranslation(config.height, config.width, p=0.0),
+    #     T.RandomHorizontalFlip(),
+    # ##    TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+    #     T.ToTensor(),
+    #     T.Normalize(mean=norm_mean, std=norm_std),
+    #     T.RandomErasing(),
     # ])
+
+    transform_train = T.Compose([
+        TT.Resize([config.height, config.width]),
+        TT.RandomHorizontalFlip(p=0.5),
+        TT.Pad(10),
+        TT.RandomCrop([config.height, config.width]),
+        TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+        TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
+       # T.RandomPatch(),
+        TT.ToTensor(),
+        TT.Normalize(mean=norm_mean, std=norm_std),
+        T.RandomErasing()
+    ])
 
 
 
@@ -210,6 +212,13 @@ def main():
         model.to("cuda")
         model, optimizer = amp.initialize(model, optimizer, opt_level="O1")             
         print('Using apex for mix_precision with opt_level O1')
+
+####
+    if len(config.gpu_devices.split(',')) > 1:
+        if config.syncBN:
+            model = apex.parallel.convert_syncbn_model(model)
+            print('Using apex SyncBN implementation')
+
 
 
     if config.fixbase_epoch > 0:

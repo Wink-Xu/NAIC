@@ -25,7 +25,7 @@ import numpy as np
 __all__ = ['re_ranking']
 
 
-def re_ranking(q_g_dist, q_q_dist, g_g_dist, k1=20, k2=6, lambda_value=0.3):
+def re_ranking(q_g_dist, q_q_dist, g_g_dist, k1=30, k2=4, lambda_value=0.8):
 
 
     original_dist = np.concatenate(

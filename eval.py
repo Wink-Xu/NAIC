@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
-
+import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from torchreid import data_manager
 from torchreid.dataset_loader import ImageDataset
@@ -41,7 +41,7 @@ import ipdb as pdb
 from configs.merge_config import merge_config
 import importlib
 import json
-
+import tqdm
 parser = argparse.ArgumentParser(description='Train image model')
 
 
@@ -263,17 +263,61 @@ def eval(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 200):
     return 
 
 
+def aqe_func_gpu(all_feature,k2,alpha,len_slice = 1000):
+    all_feature = F.normalize(all_feature, p=2, dim=1)
+    gpu_feature = all_feature.cuda()
+    T_gpu_feature = gpu_feature.permute(1,0)
+    all_feature = all_feature.numpy()
+
+    n_iter = len(all_feature) // len_slice + int(len(all_feature) % len_slice > 0)
+
+    all_features = []
+
+
+    for i in range(n_iter):
+        # cal sim by gpu
+        sims = torch.mm(gpu_feature[i*len_slice:(i+1)*len_slice], T_gpu_feature)
+        sims = sims.data.cpu().numpy()
+        for sim in sims:
+            initial_rank = np.argpartition(-sim,range(1,k2+1)) # 1,N
+            # initial_rank = np.argpartition(-sim,k2) # 1,N
+            weights = sim[initial_rank[:k2]].reshape((-1,1)) # k2,1
+            # weights /= np.max(weights)
+            weights = np.power(weights,alpha)
+        
+            all_features.append(np.mean(all_feature[initial_rank[:k2],:]*weights,axis=0))
+
+
+    all_feature = np.stack(all_features,axis=0)
+
+    all_feature = torch.from_numpy(all_feature)
+    all_feature = F.normalize(all_feature, p=2, dim=1)
+    return all_feature
 
 
 def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], return_distmat=False):
     qf, q_pids, q_camids = extract_feature(queryloader, model, use_gpu, flip=True)
     gf, g_pids, g_camids = extract_feature(galleryloader, model, use_gpu, flip=True)
-        
     m, n = qf.size(0), gf.size(0)
+   
+    if config.aqe:
+        all_feature = np.concatenate([qf, gf], axis = 0)
+        k2 = 7
+        alpha = 3.0
+        all_feature = torch.from_numpy(all_feature)
+        print("==>using weight query expansion k2: {} alpha: {}".format(k2,alpha))
+        all_feature = aqe_func_gpu(all_feature,k2,alpha,len_slice = 2000)
+        
+        qf = all_feature[:m]
+        gf = all_feature[m:]
+
+    
     distmat = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n) + \
               torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
     distmat.addmm_(1, -2, qf, gf.t())
     distmat = distmat.numpy()
+
+
 
     if config.rerank:
         print('Applying person re-ranking ...')
