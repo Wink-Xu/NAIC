@@ -21,7 +21,7 @@ config.optim = 'adam'
 config.max_epoch = 60
 config.start_epoch = 0
 config.train_batch = 32
-config.test_batch = 100
+config.test_batch = 512
 config.lr = 0.0003
 config.stepsize = [20, 40]
 config.gamma = 0.1
@@ -61,4 +61,4 @@ config.syncBN = 1
 # postprocess
 config.rerank = 1
 config.aqe = 1
-
+config.TTA = 0

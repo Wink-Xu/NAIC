@@ -25,7 +25,7 @@ from torchreid.dataset_loader import ImageDataset
 from torchreid import transforms as T
 import torchvision.transforms as TT
 from torchreid import models
-from torchreid.losses import CrossEntropyLabelSmooth, DeepSupervision, MGSupervision, TripletLoss, WeightedTripletLoss
+from torchreid.losses import CrossEntropyLabelSmooth, DeepSupervision, MGSupervision, TripletLoss, WeightedTripletLoss, CenterLoss, OIMLoss
 from torchreid.utils.iotools import save_checkpoint, check_isfile
 from torchreid.utils.avgmeter import AverageMeter
 from torchreid.utils.logger import Logger
@@ -178,6 +178,9 @@ def main():
 
     if config.label_smooth:
         criterion = CrossEntropyLabelSmooth(num_classes=dataset.num_train_pids, use_gpu=use_gpu)
+    elif config.oim:
+        criterion =  OIMLoss(feat_dim=2048, num_classes=dataset.num_train_pids, scalar=20.0, momentum=0.5, label_smooth=False, epsilon=0.1, weight=None)  # oim loss
+        print("oim loss, label smooth off, numclasses:", dataset.num_train_pids)
     else:
         criterion = nn.CrossEntropyLoss()
     if config.triplet:
@@ -185,7 +188,15 @@ def main():
             criterion_htri = WeightedTripletLoss()
         else:
             criterion_htri = TripletLoss(config.TRI_MARGIN)
-
+    else:
+        criterion_htri = None
+    
+    if config.center:
+        criterion_center = CenterLoss(num_classes=dataset.num_train_pids, feat_dim=2048, use_gpu=use_gpu)
+        optimizer_center = torch.optim.SGD(criterion_center.parameters(), lr=config.CENTER_LR) 
+    else:
+        criterion_center = None
+        optimizer_center = None
 
     if not config.debug:
         optimizer = make_optimizer(config, model)
@@ -303,10 +314,11 @@ def main():
 
     for epoch in range(config.start_epoch, config.max_epoch):
         start_train_time = time.time()
-        if config.triplet:
-            train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_gpu, summary_writer, config)
-        else:
-            train(epoch, model, criterion, None, optimizer, trainloader, use_gpu, summary_writer, config)
+        train(epoch, model, criterion, criterion_htri, criterion_center, optimizer, optimizer_center, trainloader, use_gpu, summary_writer, config)
+        # if config.triplet:
+        #     train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_gpu, summary_writer, config)
+        # else:
+        #     train(epoch, model, criterion, None, optimizer, trainloader, use_gpu, summary_writer, config)
         train_time += round(time.time() - start_train_time)
         
         scheduler.step()
@@ -350,7 +362,7 @@ def class_preds(outputs):
     _, preds = torch.max(score.data, 1)
     return preds
 
-def train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_gpu, summary_writer, config, freeze_bn=False):
+def train(epoch, model, criterion, criterion_htri, criterion_center, optimizer, optimizer_center, trainloader, use_gpu, summary_writer, config, freeze_bn=False):
     losses = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -378,10 +390,18 @@ def train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_g
 
         if isinstance(outputs, tuple):
             ce_loss = DeepSupervision(criterion, outputs, pids)
+        elif config.oim:
+            ce_loss, oim_outputs = criterion(outputs, pids)
+            acc = (oim_outputs.max(1)[1] == pids).float().mean()
         else:
             ce_loss = criterion(outputs, pids)
-        
-        if config.triplet:
+
+        if config.triplet and config.center:
+            htri_loss = criterion_htri(features, pids)
+            center_loss = criterion_center(features, pids)
+
+            loss = config.CE_LOSS_WEIGHT * ce_loss + config.TRI_LOSS_WEIGHT * htri_loss + config.CENTER_LOSS_WEIGHT * center_loss
+        elif config.triplet:
             if isinstance(features, tuple):
                 htri_loss = DeepSupervision(criterion_htri, features, pids)
             else:
@@ -393,8 +413,10 @@ def train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_g
         
         preds = class_preds(outputs)
         corrects = float(torch.sum(preds == pids.data))
-        acc = corrects / pids.size(0)
-
+        if not config.oim:
+            acc = corrects / pids.size(0)
+        if config.center:
+            optimizer_center.zero_grad()
         optimizer.zero_grad()
         if config.apex:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -402,6 +424,10 @@ def train(epoch, model, criterion, criterion_htri, optimizer, trainloader, use_g
         else:
             loss.backward()
         optimizer.step()
+        if config.center:
+            for param in criterion_center.parameters():
+                param.grad.data *= (1. / config.CENTER_LOSS_WEIGHT)
+                optimizer_center.step()
 
         batch_time.update(time.time() - end)
         losses.update(loss.item(), pids.size(0))

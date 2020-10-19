@@ -10,6 +10,7 @@ from .dukemtmcvidreid import DukeMTMCVidReID
 from .NAIC_2020 import NAIC_2020
 from .NAIC_2020_test import NAIC_2020_test
 from .VeRi776 import VeRi776
+from .NAIC_2020_test_B import NAIC_2020_test_B
 __imgreid_factory = {
     'market1501': Market1501,
     'cuhk03': CUHK03,
@@ -17,6 +18,7 @@ __imgreid_factory = {
     'msmt17': MSMT17,
     'NAIC_2020':NAIC_2020,
     'NAIC_2020_test':NAIC_2020_test,
+    'NAIC_2020_test_B':NAIC_2020_test_B,
     'VeRi776':VeRi776
 }
 

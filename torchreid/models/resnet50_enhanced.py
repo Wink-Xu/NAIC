@@ -11,6 +11,7 @@ from torchreid.losses.face_loss import Arcface
 from .resnet_ibn_a import resnet101_ibn_a
 from .resnet_ibn_b import resnet101_ibn_b
 from .efficientnet import EfficientNet
+from .se_resnet_ibn import se_resnet101_ibn_a
 import math
 __all__ = ['ResNet50_bot', 'ResNet50_bot_circle', 'ResNet101_bot']
 
@@ -480,6 +481,20 @@ def ResNet101_ibn_b(config, pretrained=True, **kwargs):
         print('Loading pretrained ImageNet model......from {}'.format(pretrain_path))
     return model	
 
+def SE_ResNet101_ibn_a(config, pretrained=True, **kwargs):
+    """Constructs a ResNet-101 model.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+
+    pretrain_path = './pretrained/se_resnet101_ibn_a-fabed4e2.pth'
+   
+    model = se_resnet101_ibn_a()
+    if pretrained:
+        model.load_param(pretrain_path)
+        print('Loading pretrained ImageNet model......from {}'.format(pretrain_path))
+    return model	
 
 def ResNet101_more(config, pretrained=True, **kwargs):
     """Constructs a ResNet-101 model.
@@ -514,10 +529,13 @@ class ResNet50_bot(nn.Module):
         super(ResNet50_bot, self).__init__()
         self.loss_type = config.loss_type
         self.loss = loss
+        self.oim = config.oim
         if config.resnet101_a:
             self.base = ResNet101_ibn_a(config, pretrained=True)
         elif config.resnet101_b:
             self.base = ResNet101_ibn_b(config, pretrained=True)
+        elif config.se_resnet101_ibn_a:
+            self.base = SE_ResNet101_ibn_a(config, pretrained = True)
         elif config.efficientnet:
             self.base = EfficientNet.from_pretrained('efficientnet-b0', './pretrained/efficientnet-b0-355c32eb.pth')
         else:
@@ -547,7 +565,10 @@ class ResNet50_bot(nn.Module):
         f_after = self.bottleneck(f)
         if not self.training:
             return f_after
-        if self.loss_type == 'arcface':
+
+        if self.oim:
+            y = f_after
+        elif self.loss_type == 'arcface':
             y = self.classifier(f_after, targets)
         else:
             y = self.classifier(f_after)

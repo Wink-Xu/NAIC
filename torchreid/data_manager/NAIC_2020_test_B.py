@@ -14,24 +14,25 @@ from scipy.io import loadmat
 import numpy as np
 import h5py
 
-class NAIC_2020(object):
+
+class NAIC_2020_test_B(object):
     """
     NAIC_2020
     """
     dataset_dir = 'NAIC_2020'
 
     def __init__(self, root='../../../data', verbose=True, **kwargs):
-        super(NAIC_2020, self).__init__()
+        super(NAIC_2020_test_B, self).__init__()
         self.dataset_dir = osp.join(root, self.dataset_dir)
         self.train_dir = osp.join(self.dataset_dir, 'train')
-        self.gallery_dir = osp.join(self.dataset_dir, 'train')
-        self.query_dir = osp.join(self.dataset_dir, 'train')
-        self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img_allImg_withNoLabelData.txt')
-        self.list_query_path = osp.join(self.dataset_dir, 'train', 'list_query_img_ratio.txt')
-        self.list_gallery_path = osp.join(self.dataset_dir, 'train', 'list_gallery_img_ratio.txt')
+        self.gallery_dir = osp.join(self.dataset_dir, 'image_B')
+        self.query_dir = osp.join(self.dataset_dir, 'image_B')
+        self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img.txt')
+        self.list_query_path = osp.join(self.dataset_dir, 'image_B', 'list_query_img_B.txt')
+        self.list_gallery_path = osp.join(self.dataset_dir, 'image_B', 'list_gallery_img_B.txt')
 
         self._check_before_run()
-        train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path, relabel = 1)
+        train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path)
         query, num_query_pids, num_query_imgs = self._process_dir(self.query_dir, self.list_query_path)
         gallery, num_gallery_pids, num_gallery_imgs = self._process_dir(self.gallery_dir, self.list_gallery_path)
 
@@ -44,7 +45,7 @@ class NAIC_2020(object):
             print("  ------------------------------")
             print("  subset   | # ids | # images")
             print("  ------------------------------")
-            print("  train    | {:5d} | {:8d}".format(num_train_pids, num_train_imgs))
+            print("  train    | {:5d} | {:8d}".format(num_train_pids, num_train_imgs, relabel = 1))
             print("  query    | {:5d} | {:8d}".format(num_query_pids, num_query_imgs))
             print("  gallery  | {:5d} | {:8d}".format(num_gallery_pids, num_gallery_imgs))
             print("  ------------------------------")
@@ -74,6 +75,7 @@ class NAIC_2020(object):
         dataset = []
         pid_container = set()
 
+
         temp = set()
         for line in lines:
             pid = line.split(' ')[-1]
@@ -81,12 +83,10 @@ class NAIC_2020(object):
         pid2label = {pid:label for label, pid in enumerate(temp)}
         for img_idx, img_info in enumerate(lines):
             img_path, pid = img_info.split(' ')
-            if relabel: 
-                pid = pid2label[pid]
-            
-            #img_path = osp.join(dir_path, img_path)
+            if relabel: pid = pid2label[pid]
 
-            camid = 1 #int(img_path.split('_')[2])
+            camid = img_path.split('/')[-1] #int(img_path.split('_')[2])
+            img_path = osp.join(dir_path, img_path)
             dataset.append((img_path, pid, camid))
             pid_container.add(pid)
         num_imgs = len(dataset)

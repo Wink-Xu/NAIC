@@ -33,6 +33,8 @@ config.arch = 'resnet50_bot'
 config.resnet101_a = 0
 config.resnet101_b = 1
 config.efficientnet = 0
+config.se_resnet101_ibn_a = 0
+
 
 config.label_smooth = False
 config.class_balance = True
@@ -44,6 +46,13 @@ config.weight_triplet = 0
 config.TRI_MARGIN = 0.3
 config.CE_LOSS_WEIGHT = 0.33
 config.TRI_LOSS_WEIGHT = 1
+
+config.oim = 0
+
+config.center = 0
+config.CENTER_LR = 0.5
+config.CENTER_LOSS_WEIGHT = 0.0003
+
 
 config.nl = 0
 config.ibn = 1

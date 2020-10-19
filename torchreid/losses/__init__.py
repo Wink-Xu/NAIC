@@ -10,7 +10,7 @@ from .center_loss import CenterLoss
 from .ring_loss import RingLoss
 from .circle_loss import LabelCircleLoss
 from .CrossEntropyFastReID import CrossEntropyLossFastReID 
-
+from .oim_loss import OIMLoss
 import pdb
 import torch
 

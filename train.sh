@@ -199,18 +199,56 @@
 ## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
 #python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_RP --gpu-devices 0,1,2,3
 ## 实验2. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
-python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std --gpu-devices 4,5,6,7
-
-
-
-## 实验1. base + gemlr*10   + 2019Data 128 16x4 efficientnet-b4    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
-#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 64 --save-dir log/20200917/efficientb4_16x4_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 0,1,2,3
-## 实验2. base + gemlr*10   + 2019Data 128 32x8 efficientnet-b4    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
-#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 128 --save-dir log/20200917/efficientb4_16x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_augGrad --gpu-devices 4,5,6,7
-
-
-
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std --gpu-devices 4,5,6,7
 ###  aqe 可以涨分！！！！。
+# ---------------------------------------------------------------------- 20200918
+## 实验1. base + gemlr*10   + 2019Data 64 16x4 efficientnet-b4    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 64 --save-dir log/20200918/efficientb4_16x4_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 0,1,2,3,4,5,6,7
+##  failure
+# ---------------------------------------------------------------------- 20200921
+#  efficientnet 先放在一边吧 搞了半天没训练好 估计得相应的调参 参数不好找。
+#  这个星期在数据上下功夫！！！
+#  先把对齐搞上
+#
+#
+# ---------------------------------------------------------------------- 20200923
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   + alignData
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200923/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_alignData --gpu-devices 4,5,6,7
+# 修改NAIC_2020_DATA
+## 实验2. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   + f_after
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200923/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_fafter --gpu-devices 0,1,2,3
+## 实验3. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  576x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   + f_after
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200923/resnet101_ibn_b_32x8_90_s1_576x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 0,1,2,3
+##  Align Data 没卵用
+# ---------------------------------------------------------------------- 20200925
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  se_resnet101_ibn_a    maxepoch 变成 90  384x128  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth  
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200925/se_resnet101_ibn_b_32x8_90_s1_384x128_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 4,5,6,7
+# ---------------------------------------------------------------------- 20200928
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   center_loss
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200928/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_center --gpu-devices 0,1,2,3,4,5,6,7
+
+# ---------------------------------------------------------------------- 20200928
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   center_loss
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20200928/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_center --gpu-devices 0,1,2,3,4,5,6,7
+
+# ---------------------------------------------------------------------- 20201012
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   oim_loss
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201012/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_oim --gpu-devices 0,1,2,3,4,5,6,7
+# 没用
+
+# ---------------------------------------------------------------------- 20201013
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth  nolocal
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201013/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_nonlocal --gpu-devices 0,1,2,3
+
+## 实验2. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth   all Data
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201013/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData --gpu-devices 4,5,6,7
+
+# ---------------------------------------------------------------------- 20201014
+## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth  nolocal
+python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201013/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData_withNoLabelData --gpu-devices 0,1,2,3
+
+
+
 #scp -r xuzihao@192.168.9.251:/data/xuzihao/NAIC/ReID/code/train.sh ./
 
 #
@@ -218,4 +256,11 @@ python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_
 ### center loss
 ## ranger
 ## rerank args
-
+## pretrained 
+##  各种finetuning试试
+## topK loss
+## arcface的参数
+## Test Time Augmentation
+##  ++ se ?
+## mixup cutmix
+## OIM LOSS

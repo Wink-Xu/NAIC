@@ -30,7 +30,8 @@ from torchreid.utils.avgmeter import AverageMeter
 from torchreid.utils.logger import Logger
 from torchreid.utils.torchtools import set_bn_to_eval, count_num_param
 from torchreid.utils.reidtools import visualize_ranked_results
-from torchreid.utils.rerank import re_ranking
+#from torchreid.utils.rerank import re_ranking
+from torchreid.utils.rerank_luo import re_ranking
 from torchreid.eval_metrics import evaluate
 from torchreid.samplers import RandomIdentitySampler
 from torchreid.optimizers import init_optim
@@ -92,7 +93,7 @@ def main():
     )
 
     norm_mean = [0.485, 0.456, 0.406] + [0.0]*config.mask_num
-    norm_std = [0.229, 0.224, 0.225] + [1.0]*config.mask_num
+    norm_std = [0.229, 0.224, -0.225] + [1.0]*config.mask_num
     transform_train = T.Compose([
         T.Random2DTranslation(config.height, config.width, p=0.0),
         T.RandomHorizontalFlip(),
@@ -195,6 +196,7 @@ def class_preds(outputs):
     _, preds = torch.max(score.data, 1)
     return preds
 
+
 def fliplr(img, use_gpu):
     '''flip horizontal'''
     if use_gpu:
@@ -204,7 +206,31 @@ def fliplr(img, use_gpu):
     img_flip = img.index_select(3,inv_idx)
     return img_flip
 
-def extract_feature(dataloader, model, use_gpu, flip=False):
+def scale(x, scale_factor, interpolation="nearest", align_corners=None):
+    """scale batch of images by `scale_factor` with given interpolation mode"""
+    h, w = x.shape[2:]
+    new_h = int(h * scale_factor)
+    new_w = int(w * scale_factor)
+    return F.interpolate(
+        x, size=(new_h, new_w), mode=interpolation, align_corners=align_corners
+    )
+
+def center_crop(x, crop_h, crop_w):
+    """make center crop"""
+
+    center_h = x.shape[2] // 2
+    center_w = x.shape[3] // 2
+    half_crop_h = crop_h // 2
+    half_crop_w = crop_w // 2
+
+    y_min = center_h - half_crop_h
+    y_max = center_h + half_crop_h + crop_h % 2
+    x_min = center_w - half_crop_w
+    x_max = center_w + half_crop_w + crop_w % 2
+
+    return x[:, :, y_min:y_max, x_min:x_max]
+
+def extract_feature(config, dataloader, model, use_gpu, flip=False):
     batch_time = AverageMeter()
     model.eval()
 
@@ -230,6 +256,13 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
                     imgs = fliplr(imgs, use_gpu)
                 
                 features += model(imgs, pids)
+            
+            if config.TTA:
+                imgs = scale(imgs, 0.9)
+                features += model(imgs, pids)
+
+                imgs = center_crop(imgs, config.height - 20, config.width - 20)
+                features += model(imgs, pids)
 
             batch_time.update(time.time() - end)
 
@@ -244,6 +277,8 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
         print("==> BatchTime(s)/BatchSize(img): {:.3f}/{}".format(batch_time.avg, config.test_batch))
 
         qf = qf.squeeze()
+
+
         return qf, q_pids, q_camids
 
 def eval(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 200):
@@ -296,8 +331,8 @@ def aqe_func_gpu(all_feature,k2,alpha,len_slice = 1000):
 
 
 def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], return_distmat=False):
-    qf, q_pids, q_camids = extract_feature(queryloader, model, use_gpu, flip=True)
-    gf, g_pids, g_camids = extract_feature(galleryloader, model, use_gpu, flip=True)
+    qf, q_pids, q_camids = extract_feature(config, queryloader, model, use_gpu, flip=True)
+    gf, g_pids, g_camids = extract_feature(config, galleryloader, model, use_gpu, flip=True)
     m, n = qf.size(0), gf.size(0)
    
     if config.aqe:
@@ -312,31 +347,44 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], retur
         gf = all_feature[m:]
 
     
-    distmat = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n) + \
-              torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
-    distmat.addmm_(1, -2, qf, gf.t())
-    distmat = distmat.numpy()
+    # distmat = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n) + \
+    #           torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
+    # distmat.addmm_(1, -2, qf, gf.t())
+    # distmat = distmat.numpy()
 
 
 
     if config.rerank:
         print('Applying person re-ranking ...')
-        distmat_qq = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m) + \
-                torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m).t()
-        distmat_qq.addmm_(1, -2, qf, qf.t())
-        distmat_qq = distmat_qq.numpy()
+        # distmat_qq = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m) + \
+        #         torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m).t()
+        # distmat_qq.addmm_(1, -2, qf, qf.t())
+        # distmat_qq = distmat_qq.numpy()
 
-        distmat_gg = torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n) + \
-                torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n).t()
-        distmat_gg.addmm_(1, -2, gf, gf.t())
-        distmat_gg = distmat_gg.numpy()
+        # distmat_gg = torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n) + \
+        #         torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n).t()
+        # distmat_gg.addmm_(1, -2, gf, gf.t())
+        # distmat_gg = distmat_gg.numpy()
 
-        distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+        # distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+        distmat = re_ranking(qf, gf, 30, 4, 0.8)
 
+
+    clusters = {}
+
+    clusters['query_path'] = q_camids
+    clusters['gallery_path'] = g_camids
+
+    clusters['query_feat'] = qf
+    clusters['gallery_feat'] = gf
+
+    clusters['dist_mat'] = distmat
+
+    torch.save(clusters, './result_for_ensemble_B/submission_example_A.pth'.replace('submission_example_A', args.load_weights.split('/')[-2]))
 
     print("Get Result")
     eval(distmat, q_pids, g_pids, q_camids, g_camids)
-    
+
     print(" ----- Finished -----")
     return distmat
 
