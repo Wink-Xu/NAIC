@@ -894,7 +894,7 @@ class MGResNet50V3a(nn.Module):
             self.branch_name[i] = 'branch%d'%(i+1)
             setattr(self, self.branch_name[i], MGBranchV3a(num_classes, parts_num=num, onnx_en=self.onnx_en))
 
-    def forward(self, x):
+    def forward(self, x, target= None):
         x = self.common(x)
         y = [] 
         for i, num in enumerate(self.branch_stripes):

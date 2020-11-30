@@ -23,12 +23,12 @@ class NAIC_2020(object):
     def __init__(self, root='../../../data', verbose=True, **kwargs):
         super(NAIC_2020, self).__init__()
         self.dataset_dir = osp.join(root, self.dataset_dir)
-        self.train_dir = osp.join(self.dataset_dir, 'train')
+        self.train_dir = osp.join(self.dataset_dir, 'rematch/train')
         self.gallery_dir = osp.join(self.dataset_dir, 'train')
         self.query_dir = osp.join(self.dataset_dir, 'train')
-        self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img_allImg_withNoLabelData.txt')
-        self.list_query_path = osp.join(self.dataset_dir, 'train', 'list_query_img_ratio.txt')
-        self.list_gallery_path = osp.join(self.dataset_dir, 'train', 'list_gallery_img_ratio.txt')
+        self.list_train_path = osp.join(self.dataset_dir,  'list_train_img_notRed_allData_delchu.txt')
+        self.list_query_path = osp.join(self.dataset_dir,  'list_query_img_notRed.txt')
+        self.list_gallery_path = osp.join(self.dataset_dir,  'list_gallery_img_notRed.txt')
 
         self._check_before_run()
         train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path, relabel = 1)
@@ -80,6 +80,7 @@ class NAIC_2020(object):
             temp.add(pid)
         pid2label = {pid:label for label, pid in enumerate(temp)}
         for img_idx, img_info in enumerate(lines):
+           # print(img_info)
             img_path, pid = img_info.split(' ')
             if relabel: 
                 pid = pid2label[pid]

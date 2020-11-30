@@ -12,7 +12,7 @@ import argparse
 import os.path as osp
 import numpy as np
 import scipy.io
-
+import torchvision.transforms as TT
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -30,6 +30,7 @@ from torchreid.utils.avgmeter import AverageMeter
 from torchreid.utils.logger import Logger
 from torchreid.utils.torchtools import set_bn_to_eval, count_num_param
 from torchreid.utils.reidtools import visualize_ranked_results
+from torchreid.adabn import bn_update
 #from torchreid.utils.rerank import re_ranking
 from torchreid.utils.rerank_luo import re_ranking
 from torchreid.eval_metrics import evaluate
@@ -93,14 +94,46 @@ def main():
     )
 
     norm_mean = [0.485, 0.456, 0.406] + [0.0]*config.mask_num
-    norm_std = [0.229, 0.224, -0.225] + [1.0]*config.mask_num
+    norm_std = [0.229, 0.224, 0.225] + [1.0]*config.mask_num
+
+    norm_mean_query = [0.351,0.367,0.356]
+    norm_std_query = [0.124,0.150,0.160]
+
+    norm_mean_gallery = [0.252,0.288,0.286]
+    norm_std_gallery = [0.142,0.167,0.188]
+
+    # norm_mean =  [0.228,0.268,0.264]
+    # norm_std =  [0.144,0.166,0.190]
+    # transform_train = T.Compose([
+    #     T.Random2DTranslation(config.height, config.width, p=0.0),
+    #     T.RandomHorizontalFlip(),
+    #     T.ToTensor(),
+    #     T.Normalize(mean=norm_mean, std=norm_std),
+    #     T.RandomErasing(),
+    # ])
+
     transform_train = T.Compose([
-        T.Random2DTranslation(config.height, config.width, p=0.0),
-        T.RandomHorizontalFlip(),
-        T.ToTensor(),
-        T.Normalize(mean=norm_mean, std=norm_std),
-        T.RandomErasing(),
+        TT.Resize([config.height, config.width]),
+        TT.RandomHorizontalFlip(p=0.5),
+        TT.Pad(10),
+        TT.RandomCrop([config.height, config.width]),
+        TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+        TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
+       # T.RandomPatch(),
+        TT.ToTensor(),
+        TT.Normalize(mean=norm_mean, std=norm_std),
+        T.RandomErasing()
     ])
+
+    pin_memory = True if use_gpu else False
+    trainloader = DataLoader(
+        ImageDataset(dataset.train, transform=transform_train),
+        sampler=RandomIdentitySampler(dataset.train, config.train_batch, config.num_instance),
+        batch_size=config.train_batch, num_workers=config.workers,
+        pin_memory=pin_memory, drop_last=True,
+    )
+
+
 
     transform_test = T.Compose([
         T.Resize((config.height, config.width)),
@@ -108,16 +141,30 @@ def main():
         T.Normalize(mean=norm_mean, std=norm_std),
     ])
 
+    transform_test_query = T.Compose([
+        T.Resize((config.height, config.width)),
+        T.ToTensor(),
+        T.Normalize(mean=norm_mean, std=norm_std),
+    ])
+
+    transform_test_gallery = T.Compose([
+        T.Resize((config.height, config.width)),
+        T.ToTensor(),
+        T.Normalize(mean=norm_mean, std=norm_std),
+    ])
+
+
+
     pin_memory = True if use_gpu else False
 
     queryloader = DataLoader(
-        ImageDataset(dataset.query, transform=transform_test),
+        ImageDataset(dataset.query, transform=transform_test_query),
         batch_size=config.test_batch, shuffle=False, num_workers=config.workers,
         pin_memory=pin_memory, drop_last=False,
     )
 
     galleryloader = DataLoader(
-        ImageDataset(dataset.gallery, transform=transform_test),
+        ImageDataset(dataset.gallery, transform=transform_test_gallery),
         batch_size=config.test_batch, shuffle=False, num_workers=config.workers,
         pin_memory=pin_memory, drop_last=False,
     )
@@ -172,10 +219,18 @@ def main():
 
     if use_gpu:
         model = nn.DataParallel(model).cuda()
+    
+
+    if config.adabn:
+        print("==> using adabn for all bn layers")
+        bn_update(model,trainloader,cumulative = 0)
+
 
     if config.evaluate:
         print("Evaluate only")
         distmat = test(model, queryloader, galleryloader, use_gpu, return_distmat=True)
+        #distmat = getBestRerank(model, queryloader, galleryloader, use_gpu, return_distmat=True)
+        
         if config.vis_ranked_res:
             visualize_ranked_results(
                 distmat, dataset,
@@ -184,6 +239,7 @@ def main():
             )
         return
 
+    
 
 def class_preds(outputs):
     softmax = nn.Softmax(dim=1)
@@ -258,9 +314,6 @@ def extract_feature(config, dataloader, model, use_gpu, flip=False):
                 features += model(imgs, pids)
             
             if config.TTA:
-                imgs = scale(imgs, 0.9)
-                features += model(imgs, pids)
-
                 imgs = center_crop(imgs, config.height - 20, config.width - 20)
                 features += model(imgs, pids)
 
@@ -292,7 +345,7 @@ def eval(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 200):
     for i in range(num_q):
         result_dict[q_camids[i]] = list(imgName_rank[i])
     
-    with open(os.path.join(config.save_dir, 'test.json'), 'w') as fw:
+    with open(os.path.join(config.save_dir, 'test_rematch.json'), 'w') as fw:
         json.dump(result_dict, fw)
 
     return 
@@ -337,7 +390,7 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], retur
    
     if config.aqe:
         all_feature = np.concatenate([qf, gf], axis = 0)
-        k2 = 7
+        k2 = 4
         alpha = 3.0
         all_feature = torch.from_numpy(all_feature)
         print("==>using weight query expansion k2: {} alpha: {}".format(k2,alpha))
@@ -353,7 +406,6 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], retur
     # distmat = distmat.numpy()
 
 
-
     if config.rerank:
         print('Applying person re-ranking ...')
         # distmat_qq = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m) + \
@@ -367,7 +419,8 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], retur
         # distmat_gg = distmat_gg.numpy()
 
         # distmat = re_ranking(distmat, distmat_qq, distmat_gg)
-        distmat = re_ranking(qf, gf, 30, 4, 0.8)
+        #distmat = re_ranking(qf, gf, 30, 4, 0.8)
+        distmat = re_ranking(qf, gf, 10, 5, 0.8)
 
 
     clusters = {}
@@ -379,11 +432,98 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], retur
     clusters['gallery_feat'] = gf
 
     clusters['dist_mat'] = distmat
-
-    torch.save(clusters, './result_for_ensemble_B/submission_example_A.pth'.replace('submission_example_A', args.load_weights.split('/')[-2]))
+    
+    torch.save(clusters, './result_for_ensemble_C/submission_example_A.pth'.replace('submission_example_A', 'allData1026_' + args.load_weights.split('/')[-2]))
 
     print("Get Result")
     eval(distmat, q_pids, g_pids, q_camids, g_camids)
+
+    print(" ----- Finished -----")
+    return distmat
+
+
+
+def getBestRerank(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20], return_distmat=False):
+    qf_, q_pids, q_camids = extract_feature(config, queryloader, model, use_gpu, flip=True)
+    gf_, g_pids, g_camids = extract_feature(config, galleryloader, model, use_gpu, flip=True)
+    m, n = qf_.size(0), gf_.size(0)
+
+
+    k2_list = list(range(2, 12))
+    alpha_list = list(range(2,7))
+
+    for i in k2_list:
+        for j in alpha_list:
+            
+            print(str(i) + ' ----- ' + str(j))
+            print("Computing CMC and mAP")
+
+            if config.aqe:
+                all_feature = np.concatenate([qf_, gf_], axis = 0)
+                k2 = i
+                alpha = j
+                all_feature = torch.from_numpy(all_feature)
+                print("==>using weight query expansion k2: {} alpha: {}".format(k2,alpha))
+                all_feature = aqe_func_gpu(all_feature,k2,alpha,len_slice = 2000)
+                
+                qf = all_feature[:m]
+                gf = all_feature[m:]
+
+            if config.rerank:
+                print('Applying person re-ranking ...')
+                # distmat_qq = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m) + \
+                #         torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m).t()
+                # distmat_qq.addmm_(1, -2, qf, qf.t())
+                # distmat_qq = distmat_qq.numpy()
+
+                # distmat_gg = torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n) + \
+                #         torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n).t()
+                # distmat_gg.addmm_(1, -2, gf, gf.t())
+                # distmat_gg = distmat_gg.numpy()
+
+                # distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+                #distmat = re_ranking(qf, gf, 30, 4, 0.8)
+                distmat = re_ranking(qf, gf, 10, 5, 0.8)
+
+            cmc, mAP = evaluate(distmat, q_pids, g_pids, q_camids, g_camids)
+            print("Results ----------")
+            print("mAP: {:.1%}".format(mAP))
+            print("CMC curve")
+            for r in ranks:
+                print("Rank-{:<3}: {:.1%}".format(r, cmc[r-1]))
+            print("------------------")
+    # if config.rerank:
+    #     print('Applying person re-ranking ...')
+    #     # distmat_qq = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m) + \
+    #     #         torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, m).t()
+    #     # distmat_qq.addmm_(1, -2, qf, qf.t())
+    #     # distmat_qq = distmat_qq.numpy()
+
+    #     # distmat_gg = torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n) + \
+    #     #         torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, n).t()
+    #     # distmat_gg.addmm_(1, -2, gf, gf.t())
+    #     # distmat_gg = distmat_gg.numpy()
+
+    #     # distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+ 
+    #     k1 = list(range(6, 31))
+    #     k2 = list(range(2,7))
+    #     alpha = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    #     for i in alpha:
+    #         for j in k2:
+    #             for k in k1:
+    #                 distmat = re_ranking(qf, gf, k, j, i)
+    #                 print(str(k) + ' ----- ' + str(j) + ' ----- ' + str(i))
+    #                 print("Computing CMC and mAP")
+    #                 cmc, mAP = evaluate(distmat, q_pids, g_pids, q_camids, g_camids)
+
+    #                 print("Results ----------")
+    #                 print("mAP: {:.1%}".format(mAP))
+    #                 print("CMC curve")
+    #                 for r in ranks:
+    #                     print("Rank-{:<3}: {:.1%}".format(r, cmc[r-1]))
+    #                 print("------------------")
+
 
     print(" ----- Finished -----")
     return distmat

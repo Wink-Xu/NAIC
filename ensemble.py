@@ -65,20 +65,28 @@ def weightSum(paths, weights=None):
     for i, qpath in enumerate(anchor_query_path):
         img_name = os.path.basename(qpath)
         sumbit[img_name] = anchor_gallery_path[indices[i].numpy()].tolist()
-    with open(os.path.join('.', 'final_submit_B_1.json'), 'w', encoding='utf8') as f:
+    with open(os.path.join('./result_for_ensemble_C', 'temp.json'), 'w', encoding='utf8') as f:
         json.dump(sumbit, f)
 
 
 if __name__ == '__main__':
+    # model_results = [
+    #     'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth.pth',
+    #     'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_576x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth.pth',
+    #     'result_for_ensemble_B/resnet101_ibn_b_64x6_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug.pth',
+    #     'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug.pth',
+    #     'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std.pth',
+    #     'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData.pth',
+    # ]
+
     model_results = [
-        'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth.pth',
-        'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_576x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth.pth',
-        'result_for_ensemble_B/resnet101_ibn_b_64x6_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug.pth',
-        'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug.pth',
-        'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std.pth',
-        'result_for_ensemble_B/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData.pth',
+        'result_for_ensemble_C/allData1026_resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed.pth',
+        'result_for_ensemble_C/allData1026_resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel.pth',
+       # 'result_for_ensemble_C/allData1026_resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth.pth',
+       # 'result_for_ensemble_C/dmt_normal.pth'
     ]
-    weights = [0.20, 0.15, 0.10, 0.10, 0.20, 0.25]
+
+    weights = [0.5, 0.5]
 
 
     weightSum(model_results, weights)

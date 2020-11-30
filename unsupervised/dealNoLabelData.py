@@ -5,6 +5,7 @@ from __future__ import division
 import shutil
 import os
 import pdb
+from tqdm import tqdm
 
 ###################### abstract noLabel img to one directory ###########################
 
@@ -178,7 +179,7 @@ def fliplr(img, use_gpu):
 def extract_feature(dataloader, model, use_gpu, flip=False):
     batch_time = AverageMeter()
     model.eval()
-
+    pbar = tqdm(total=len(dataloader))
     with torch.no_grad():
         qf, q_pids, q_camids = [], [], []
         for batch_idx, (imgs, pids, camids) in enumerate(dataloader):
@@ -219,6 +220,8 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
             qf.append(features)
             q_pids.extend(pids)
             q_camids.extend(camids)
+            pbar.update(1)
+        pbar.close()
         qf = torch.cat(qf, 0)
         q_pids = np.asarray(q_pids)
         q_camids = np.asarray(q_camids)
@@ -226,6 +229,7 @@ def extract_feature(dataloader, model, use_gpu, flip=False):
         print("==> BatchTime(s)/BatchSize(img): {:.3f}/{}".format(batch_time.avg, config.test_batch))
 
         qf = qf.squeeze()
+        
         return qf, q_pids, q_camids
 
 

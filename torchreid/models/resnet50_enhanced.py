@@ -6,15 +6,14 @@ from torch import nn
 from torch.nn import functional as F
 import torchvision
 from .marginal_linear import *
-from .circle_layer import Circle
+from torchreid.losses.circle_loss import CircleLoss
 from torchreid.losses.face_loss import Arcface
 from .resnet_ibn_a import resnet101_ibn_a
 from .resnet_ibn_b import resnet101_ibn_b
 from .efficientnet import EfficientNet
 from .se_resnet_ibn import se_resnet101_ibn_a
 import math
-__all__ = ['ResNet50_bot', 'ResNet50_bot_circle', 'ResNet101_bot']
-
+__all__ = ['ResNet50_bot', 'ResNet50_bot_circle', 'ResNet101_bot', 'resnest50', 'resnest101', 'resnest200', 'resnest269']
 
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
@@ -537,7 +536,9 @@ class ResNet50_bot(nn.Module):
         elif config.se_resnet101_ibn_a:
             self.base = SE_ResNet101_ibn_a(config, pretrained = True)
         elif config.efficientnet:
-            self.base = EfficientNet.from_pretrained('efficientnet-b0', './pretrained/efficientnet-b0-355c32eb.pth')
+            self.base = EfficientNet.from_pretrained('efficientnet-b4', './pretrained/efficientnet-b4-6ed6700e.pth')
+        elif config.resnest101:
+            self.base = resnest101(pretrained=True)
         else:
             self.base = ResNet50_more(config, pretrained=True)
         if config.gem:
@@ -555,6 +556,10 @@ class ResNet50_bot(nn.Module):
             print('using {} with s:{}, m: {}'.format(config.loss_type, config.COSINE_SCALE, config.COSINE_MARGIN))
             self.classifier = Arcface(feat_dims, num_classes,
                                         s=config.COSINE_SCALE, m=config.COSINE_MARGIN)
+        elif config.loss_type == 'circle':
+            print('using {} with s:{}, m: {}'.format(config.loss_type, config.CIRCLE_S, config.CIRCLE_M))
+            self.classifier = CircleLoss(feat_dims, num_classes,
+                                        s=config.CIRCLE_S, m=config.CIRCLE_M)
         else:
             self.classifier = nn.Linear(feat_dims, num_classes, bias = False)
             self.classifier.apply(weights_init_classifier)
@@ -570,6 +575,8 @@ class ResNet50_bot(nn.Module):
             y = f_after
         elif self.loss_type == 'arcface':
             y = self.classifier(f_after, targets)
+        elif self.loss_type == 'circle':
+            y = self.classifier(f_after, targets)
         else:
             y = self.classifier(f_after)
 
@@ -579,6 +586,79 @@ class ResNet50_bot(nn.Module):
             return y, f
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
+
+#########################################################################################################
+##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+## Created by: Hang Zhang
+## Email: zhanghang0704@gmail.com
+## Copyright (c) 2020
+##
+## LICENSE file in the root directory of this source tree 
+##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+"""ResNeSt models"""
+
+from .resnet_zh import ResNet, Bottleneck
+
+
+_url_format = 'https://s3.us-west-1.wasabisys.com/resnest/torch/{}-{}.pth'
+
+_model_sha256 = {name: checksum for checksum, name in [
+    ('528c19ca', 'resnest50'),
+    ('22405ba7', 'resnest101'),
+    ('75117900', 'resnest200'),
+    ('0cc87c48', 'resnest269'),
+    ]}
+
+def short_hash(name):
+    if name not in _model_sha256:
+        raise ValueError('Pretrained model for {name} is not available.'.format(name=name))
+    return _model_sha256[name][:8]
+
+resnest_model_urls = {name: _url_format.format(name, short_hash(name)) for
+    name in _model_sha256.keys()
+}
+
+def resnest50(pretrained=False, root='~/.encoding/models', **kwargs):
+    model = ResNet(Bottleneck, [3, 4, 6, 3],
+                   radix=2, groups=1, bottleneck_width=64,
+                   deep_stem=True, stem_width=32, avg_down=True,
+                   avd=True, avd_first=False, **kwargs)
+    if pretrained:
+        model.load_state_dict(torch.hub.load_state_dict_from_url(
+            resnest_model_urls['resnest50'], progress=True, check_hash=True))
+    return model
+
+def resnest101(pretrained=False, root='~/.encoding/models', **kwargs):
+    model = ResNet(Bottleneck, [3, 4, 23, 3],
+                   radix=2, groups=1, bottleneck_width=64,
+                   deep_stem=True, stem_width=64, avg_down=True,
+                   avd=True, avd_first=False, **kwargs)
+    if pretrained:
+        model.load_state_dict(torch.hub.load_state_dict_from_url(
+            resnest_model_urls['resnest101'], progress=True))
+    return model
+
+def resnest200(pretrained=False, root='~/.encoding/models', **kwargs):
+    model = ResNet(Bottleneck, [3, 24, 36, 3],
+                   radix=2, groups=1, bottleneck_width=64,
+                   deep_stem=True, stem_width=64, avg_down=True,
+                   avd=True, avd_first=False, **kwargs)
+    if pretrained:
+        model.load_state_dict(torch.hub.load_state_dict_from_url(
+            resnest_model_urls['resnest200'], progress=True, check_hash=True))
+    return model
+
+def resnest269(pretrained=False, root='~/.encoding/models', **kwargs):
+    model = ResNet(Bottleneck, [3, 30, 48, 8],
+                   radix=2, groups=1, bottleneck_width=64,
+                   deep_stem=True, stem_width=64, avg_down=True,
+                   avd=True, avd_first=False, **kwargs)
+    if pretrained:
+        model.load_state_dict(torch.hub.load_state_dict_from_url(
+            resnest_model_urls['resnest269'], progress=True, check_hash=True))
+    return model
+
+
 
 
 class ResNet101_bot(nn.Module):

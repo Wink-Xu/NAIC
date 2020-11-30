@@ -10,7 +10,7 @@ from collections import defaultdict
 ############  get all data 
 
 
-# datapath = '../../data/NAIC_2020/train/label.txt'
+# datapath = '../../data/NAIC_2020/rematch/train/label.txt'
 # mask_dict = []
 # picNum = defaultdict(int)
 # with open(datapath, 'r') as fr:
@@ -19,15 +19,15 @@ from collections import defaultdict
 #         picNum[each.split(':')[-1].strip()] += 1
 
 
-# main_dir = '../../data/NAIC_2020/train'
-# with open(os.path.join(main_dir, 'list_train_img_allImg.txt'), 'w') as ft:
+# main_dir = '../../data/NAIC_2020/rematch/train'
+# with open(os.path.join(main_dir, 'list_train_img.txt'), 'w') as ft:
 #     query_dir = main_dir
 #     with open(os.path.join(query_dir, 'label.txt'), 'r') as fr:
 #         lines = fr.readlines()
 #         for index, i in enumerate(lines):
 #             imgid = i.split(':')[1]
 #             if picNum[imgid.strip()] >= 2:    
-#                 imgpath = os.path.join('../data/NAIC_2020/train/images', i.split(':')[0])
+#                 imgpath = os.path.join('../data/NAIC_2020/rematch/train/images', i.split(':')[0])
 #                 ft.write(imgpath + ' ' + imgid)
 
 
@@ -159,18 +159,18 @@ from collections import defaultdict
 
 # #### Get test img list
 
-main_dir = '../../data/NAIC_2020/image_B'
-with open(os.path.join(main_dir, 'list_query_img_B.txt'), 'w') as fq, open(os.path.join(main_dir, 'list_gallery_img_B.txt'), 'w') as fg:
-    query_dir = os.path.join(main_dir, 'query')
+main_dir = '../../data/NAIC_2020/rematch/image_B_v1.1'
+with open(os.path.join(main_dir, 'list_query_img_rematch_B_normal.txt'), 'w') as fq, open(os.path.join(main_dir, 'list_gallery_img_rematch_B_normal.txt'), 'w') as fg:
+    query_dir = os.path.join(main_dir, 'query_normal')
     for index, i in enumerate(os.listdir(query_dir)):
         if i.endswith('.png'):
-            imgpath = os.path.join('query', i)
+            imgpath = os.path.join('query_normal', i)
             fq.write(imgpath + ' ' + str(index))
             fq.write('\n')
-    gallery_dir = os.path.join(main_dir, 'gallery')
+    gallery_dir = os.path.join(main_dir, 'gallery_normal')
     for index, i in enumerate(os.listdir(gallery_dir)):
         if i.endswith('.png'):
-            imgpath = os.path.join('gallery', i)
+            imgpath = os.path.join('gallery_normal', i)
             fg.write(imgpath + ' ' + str(index))
             fg.write('\n')
 

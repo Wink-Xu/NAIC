@@ -245,10 +245,139 @@
 
 # ---------------------------------------------------------------------- 20201014
 ## 实验1. base + gemlr*10   + 2019Data 256 32x8  resnet101_ibn_b    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth  nolocal
-python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201013/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData_withNoLabelData --gpu-devices 0,1,2,3
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201013/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_allData_withNoLabelData --gpu-devices 0,1,2,3
+
+
+# ---------------------------------------------------------------------- 20201019
+###    MGN test
+## 实验1. mgresnet50v3a_bot_16x4_250 sampler2
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset NAIC_2020  --train-batch 64 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_32x4_90_s2  --gpu-devices 0
+## 实验2.
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_32x8_120_s2  --gpu-devices 4,5,6,7
+## 实验3.     less than 1w id data
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_32x8_120_s2_lessId_8gpu  --gpu-devices 0,1,2,3,4,5,6,7
+## 实验4.     less than 1w id data sgd 0.01
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset market1501  --train-batch 256 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_32x8_120_s2_lessId_8gpu_sgd0.1_market1501  --gpu-devices 0,1,2,3,4,5,6,7
+## 实验5.     less than 1000 id data sgd 0.01
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset NAIC_2020  --train-batch 64 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_8x4_120_s2_lesserId_8gpu_sgd0.1_meanstd  --gpu-devices 0,1,2,3,4,5,6,7
+## 实验5.     less than 1000 id data sgd 0.01
+#python train_imgreid_xent.py --config_type mgresnet50v3a  --dataset NAIC_2020  --train-batch 64 --save-dir log/20201019/NAIC/mgresnet50v3a_bot_8x4_120_s2_lesserId_8gpu_sgd0.1_meanstd_triplet  --gpu-devices 0,1,2,3
+
+#  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#
+#                                         复赛 
+#
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------- 20201026
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201026/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base --gpu-devices 4,5,6,7
+## 实验2. base 256 32x8  resnet101_ibn_b      384x192    std mean
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201026/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_stdMean_tt --gpu-devices 0,1,2,3
+
+# ---------------------------------------------------------------------- 20201028
+## 实验1. base 256 48x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 384 --save-dir log/20201026/resnet101_ibn_b_48x8_90_s1_384x192_rematch_base_384 --gpu-devices 0,1,2,3,4,5,6,7
+# 微醺万
+
+##  将data分为红色与非红色训练两个模型。
+## 实验2. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201028/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_red --gpu-devices 0,1,2,3
+## 实验3. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201028/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed --gpu-devices 4,5,6,7
+
+###
+
+# ---------------------------------------------------------------------- 20201029
+#    训练集可以分为 绿图 与 红图  但是测试集分为的是 非红图 与 红图
+#    所以今天用 绿图训练集 来测试 非红图 效果不如 allData训练集。  
+#    因此接下来要做什么？
+#    1.  看2019年训练数据的图像分布情况。 将2019与2020一起用。
+#    2.  制作一个红图测试集
+#    3.  训练两个模型 一个是 allData 专门用于测试非红图
+#                    一个是 红图 专门用于测试 红图      
+#                    最后将两个json结合。
+#    4. 红图不用colorjitter？ allData需要
+#
+
+#    full data
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201029/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed --gpu-devices 4,5,6,7
+## 实验2. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201029/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_red --gpu-devices 0,1,2,3
+
+
+# ---------------------------------------------------------------------- 20201102
+
+## allData mix
+####
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192   
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201102/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_allDatamix --gpu-devices 0,1,2,3
+
+# ---------------------------------------------------------------------- 20201105
+
+## notRed
+####
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192   ranger circle
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201105/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_ranger_circle --gpu-devices 0,1,2,3
+
+
+# ---------------------------------------------------------------------- 20201109
+
+## notRed
+####
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192  wash delete50
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201109/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_wash_delete50 --gpu-devices 0,1,2,3
+
+
+# ---------------------------------------------------------------------- 20201110
+## 实验1. base + gemlr*10   + 2019Data 384 32x8  efficientnet-b0    maxepoch 变成 90  384x192  数据踢出初赛 0.33id 1 triplet  dataAug noSmooth 
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201110/efficientb0_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_notRed_ranger --gpu-devices 0,1,2,3
+
+## 实验2. base 256 32x8  resnet101_ibn_b      384x192  
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201110/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel --gpu-devices 4,5,6,7
+
+# ---------------------------------------------------------------------- 20201111
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192  real add unlabel
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201111/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel_real --gpu-devices 0,1,2,3,4,5,6,7
+#废
+
+
+# ---------------------------------------------------------------------- 20201113
+## 实验1. base 256 32x8  resnet101_ibn_b      384x192  notRed  resnest
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 256 --save-dir log/20201113/resnest101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed --gpu-devices 0,1,2,3,4,5,6,7
+
+
+# ---------------------------------------------------------------------- 20201116
+## 实验1. base 128 16x4     384x192  notRed  resnest
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 64 --save-dir log/20201116/resnest101_ibn_b_16x4_90_s1_384x192_rematch_base_notRed --gpu-devices 0,1,2,3
+
+## 实验2. base 128 16x4     384x192  notRed  efficientnet
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 64 --save-dir log/20201116/efficientnet4_16x4_90_s1_384x192_rematch_base_notRed --gpu-devices 4,5,6,7
+
+# ---------------------------------------------------------------------- 20201117
+## 实验1. base 256 24x8  se_resnet101_ibn_a      384x192  notRed  
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 192 --save-dir log/20201117/se_resnet101_ibn_b_64x4_90_s1_384x192_rematch_base_notRed --gpu-devices 0,1,2,3
+
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 192 --save-dir log/20201117/se_resnet101_ibn_b_64x4_90_s1_384x192_rematch_base_notRed_resume --gpu-devices 0,1,2,3
+  
+
+# ---------------------------------------------------------------------- 20201119
+## 实验1. base 256 32x8  resnet101_ibn_b     384x192  notRed  
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 192 --save-dir log/20201119/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed_labelSmooth --gpu-devices 0,1,2,3
+
+## 实验2. base 256 32x8  resnet101_ibn_b     384x192  notRed  + msmt17
+#python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 192 --save-dir log/20201119/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_notRed_msmt17 --gpu-devices 4,5,6,7
+
+# ---------------------------------------------------------------------- 20201123
+## 实验2. base 256 32x8  resnest
+python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_2020  --train-batch 192 --save-dir log/20201119/resnest101_32x8_90_s1_384x192_notRed --gpu-devices 0,1,2,3,4,5,6,7
 
 
 
+
+#
+#   PIXEL_MEAN: [0.1646,0.2110,0.2467]
+#   PIXEL_STD: [0.1366,0.1373,0.1806]
 #scp -r xuzihao@192.168.9.251:/data/xuzihao/NAIC/ReID/code/train.sh ./
 
 #
@@ -264,3 +393,15 @@ python train_imgreid_xent.py --config_type resnet50_bagOfTricks  --dataset NAIC_
 ##  ++ se ?
 ## mixup cutmix
 ## OIM LOSS
+
+
+##  mean std 图像预处理
+## mixup cutmix
+# adabn
+##Test set augmentation
+
+### data wash using keypoints
+### gradCam++
+### delete num > 50 pic
+
+## cycle gan

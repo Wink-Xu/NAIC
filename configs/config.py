@@ -29,7 +29,7 @@ config.weight_decay = 5e-04
 config.fixbase_epoch = 0
 config.fixbase_lr = 0.0003
 config.freeze_bn = False
-config.label_smooth = False
+config.label_smooth = False 
 
 # Architecture
 
@@ -62,3 +62,4 @@ config.syncBN = 1
 config.rerank = 1
 config.aqe = 1
 config.TTA = 0
+config.adabn = 0

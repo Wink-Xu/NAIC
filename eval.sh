@@ -16,8 +16,8 @@
 ### 一定要记得改模型的参数！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
 # #1.
-# python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test_B  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth/best_model.pth.tar --evaluate \
-#                               --vis-ranked-res --save-dir log/B/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 0,1,2,3,4,5,6,7
+#python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth/best_model.pth.tar --evaluate \
+                              # --vis-ranked-res --save-dir log/rematch/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_testStdMean --gpu-devices 0,1,2,3
 # #2.
 # python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test_B  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200923/resnet101_ibn_b_32x8_90_s1_576x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth/best_model.pth.tar --evaluate \
 #                               --vis-ranked-res --save-dir log/B/20200923/resnet101_ibn_b_32x8_90_s1_576x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth --gpu-devices 0,1,2,3,4,5,6,7
@@ -28,8 +28,12 @@
 # python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test_B  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug/best_model.pth.tar --evaluate \
 #                               --vis-ranked-res --save-dir log/B/20200914/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug --gpu-devices 0,1,2,3,4,5,6,7
 #5.
-python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test_B  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std/best_model.pth.tar --evaluate \
-                              --vis-ranked-res --save-dir log/B/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std --gpu-devices 0,1,2,3,4,5,6,7
+#python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test  --load-weight /data/xuzihao/NAIC/ReID/code/log/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std/best_model.pth.tar --evaluate \
+#                              --vis-ranked-res --save-dir log/B/20200917/resnet101_ibn_b_32x8_90_s1_384x192_ad2_triplet_gpu1_apex_arcface_gemlr10_2019DataNew_wloss_syncBN_dataAug_noSmooth_std --gpu-devices 0,1,2,3,4,5,6,7
 
 
+#/data/xuzihao/NAIC/ReID/code/log/20201110/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel
+#/data/xuzihao/NAIC/ReID/code/log/20201029/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_red
 
+python eval.py --config_type resnet50_bagOfTricks --dataset NAIC_2020_test  --load-weight /data/xuzihao/NAIC/ReID/code/log/20201110/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel/best_model.pth.tar --evaluate \
+                               --vis-ranked-res --save-dir /data/xuzihao/NAIC/ReID/code/log/20201110/resnet101_ibn_b_32x8_90_s1_384x192_rematch_base_unlabel_B --gpu-devices 0,1,2,3

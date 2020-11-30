@@ -8,7 +8,7 @@ from .triplet_loss import TripletLoss
 from .triplet_loss import WeightedTripletLoss
 from .center_loss import CenterLoss
 from .ring_loss import RingLoss
-from .circle_loss import LabelCircleLoss
+from .circle_loss import CircleLoss
 from .CrossEntropyFastReID import CrossEntropyLossFastReID 
 from .oim_loss import OIMLoss
 import pdb

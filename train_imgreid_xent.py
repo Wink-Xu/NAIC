@@ -66,7 +66,7 @@ parser.add_argument('--load-weights', type=str, default='',
                     help="load pretrained weights but ignores layers that don't match in size")
 parser.add_argument('--vis-ranked-res', action='store_true',
                     help="visualize ranked results, only available in evaluation mode (default: False)")
-           
+parser.add_argument('--resume', type=str, default='', metavar='PATH') 
 
 args = parser.parse_args()
 config_type = args.config_type
@@ -103,11 +103,14 @@ def main():
     dataset = data_manager.init_imgreid_dataset(
         root=config.root, name=config.dataset, split_id=config.split_id
     )
-
+# 数据集train_sa的RGB平均值为
+# [0.2281118587556471,0.26800516975523453,0.2647620807973907]
+# 数据集train_sa的RGB方差为
+# [0.144330687341804,0.16672729724081023,0.19022495029040212]
     norm_mean = [0.485, 0.456, 0.406] + [0.0]*config.mask_num
     norm_std = [0.229, 0.224, 0.225] + [1.0]*config.mask_num
-    
-
+    # norm_mean =  [0.228,0.268,0.264]
+    # norm_std =  [0.144,0.166,0.190]
     # transform_train = T.Compose([
     #     T.Random2DTranslation(config.height, config.width, p=0.0),
     #     T.RandomHorizontalFlip(),
@@ -121,9 +124,9 @@ def main():
         TT.Resize([config.height, config.width]),
         TT.RandomHorizontalFlip(p=0.5),
         TT.Pad(10),
-        TT.RandomCrop([config.height, config.width]),
-        TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
-        TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
+       # TT.RandomCrop([config.height, config.width]),
+       # TT.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2),
+       # TT.transforms.RandomAffine(0, translate=None, scale=[0.9, 1.1], shear=None, resample=False, fillcolor=128),
        # T.RandomPatch(),
         TT.ToTensor(),
         TT.Normalize(mean=norm_mean, std=norm_std),
@@ -269,6 +272,7 @@ def main():
                     model_dict[k][:,:,pid:pid+1,:] = v
                     print(k)
             model.load_state_dict(model_dict)
+            optimizer.load_state_dict(checkpoint['optimizer'])
             config.start_epoch = checkpoint['epoch']
             rank1 = checkpoint['rank1']
             print("Loaded checkpoint from '{}'".format(config.resume))
@@ -342,6 +346,7 @@ def main():
                 'state_dict': state_dict,
                 'rank1': rank1,
                 'epoch': epoch,
+                'optimizer': optimizer.state_dict(),
             }, is_best, osp.join(config.save_dir, 'checkpoint_ep' + str(epoch + 1) + '.pth.tar'))
 
     print("==> Best Rank-1 {:.1%}, achieved at epoch {}".format(best_rank1, best_epoch))
@@ -376,13 +381,14 @@ def train(epoch, model, criterion, criterion_htri, criterion_center, optimizer, 
     end = time.time()
     for batch_idx, (imgs, pids, _) in enumerate(trainloader):
         data_time.update(time.time() - end)
+
         if use_gpu:
             pids = pids.cuda()
             if isinstance(imgs, list):
                 imgs = (imgs[0].cuda(), imgs[1].cuda())
             else:
                 imgs = imgs.cuda()
-
+        
         if config.triplet:
             outputs, features = model(imgs, pids)
         else:

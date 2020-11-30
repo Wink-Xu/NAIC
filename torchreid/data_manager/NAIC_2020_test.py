@@ -23,16 +23,16 @@ class NAIC_2020_test(object):
 
     def __init__(self, root='../../../data', verbose=True, **kwargs):
         super(NAIC_2020_test, self).__init__()
-        self.dataset_dir = osp.join(root, self.dataset_dir)
+        self.dataset_dir = osp.join(root, self.dataset_dir, 'rematch')
         self.train_dir = osp.join(self.dataset_dir, 'train')
-        self.gallery_dir = osp.join(self.dataset_dir, 'image_A')
-        self.query_dir = osp.join(self.dataset_dir, 'image_A')
+        self.gallery_dir = osp.join(self.dataset_dir, 'image_B_v1.1')
+        self.query_dir = osp.join(self.dataset_dir, 'image_B_v1.1')
         self.list_train_path = osp.join(self.dataset_dir, 'train', 'list_train_img.txt')
-        self.list_query_path = osp.join(self.dataset_dir, 'image_A', 'list_query_img.txt')
-        self.list_gallery_path = osp.join(self.dataset_dir, 'image_A', 'list_gallery_img.txt')
+        self.list_query_path = osp.join(self.dataset_dir, 'image_B_v1.1', 'list_query_img_rematch_B_green.txt')
+        self.list_gallery_path = osp.join(self.dataset_dir, 'image_B_v1.1', 'list_gallery_img_rematch_B_green.txt')
 
         self._check_before_run()
-        train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path)
+        train, num_train_pids, num_train_imgs = self._process_dir(self.train_dir, self.list_train_path, relabel = 1)
         query, num_query_pids, num_query_imgs = self._process_dir(self.query_dir, self.list_query_path)
         gallery, num_gallery_pids, num_gallery_imgs = self._process_dir(self.gallery_dir, self.list_gallery_path)
 
@@ -45,7 +45,7 @@ class NAIC_2020_test(object):
             print("  ------------------------------")
             print("  subset   | # ids | # images")
             print("  ------------------------------")
-            print("  train    | {:5d} | {:8d}".format(num_train_pids, num_train_imgs, relabel = 1))
+            print("  train    | {:5d} | {:8d}".format(num_train_pids, num_train_imgs))
             print("  query    | {:5d} | {:8d}".format(num_query_pids, num_query_imgs))
             print("  gallery  | {:5d} | {:8d}".format(num_gallery_pids, num_gallery_imgs))
             print("  ------------------------------")
@@ -86,7 +86,8 @@ class NAIC_2020_test(object):
             if relabel: pid = pid2label[pid]
 
             camid = img_path.split('/')[-1] #int(img_path.split('_')[2])
-            img_path = osp.join(dir_path, img_path)
+            if relabel == 0:
+                img_path = osp.join(dir_path, img_path)
             dataset.append((img_path, pid, camid))
             pid_container.add(pid)
         num_imgs = len(dataset)
